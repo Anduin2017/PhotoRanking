@@ -10,9 +10,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aiursoft.DbTools.Switchable" Version="10.0.3" />
-    <PackageReference Include="Aiursoft.Scanner" Version="10.0.1" />
-    <PackageReference Include="Aiursoft.UiStack" Version="10.0.1" />
+    <PackageReference Include="Aiursoft.DbTools.Sqlite" Version="10.0.5" />
+    <PackageReference Include="Aiursoft.WebTools" Version="10.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.1" />
@@ -21,10 +20,5 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Anduin.PhotoRanking.InMemory\Anduin.PhotoRanking.InMemory.csproj" />
-    <ProjectReference Include="..\Anduin.PhotoRanking.MySql\Anduin.PhotoRanking.MySql.csproj" />
-    <ProjectReference Include="..\Anduin.PhotoRanking.Sqlite\Anduin.PhotoRanking.Sqlite.csproj" />
   </ItemGroup>
 </Project>
