@@ -101,7 +101,7 @@ public class ScoringService
     /// <summary>
     /// 更新相册分数和统计
     /// </summary>
-    private async Task UpdateAlbumScoresAsync(Guid albumId)
+    private async Task UpdateAlbumScoresAsync(string albumId)
     {
         var album = await _context.Albums
             .Include(a => a.Photos)
@@ -148,7 +148,7 @@ public class ScoringService
     /// <summary>
     /// 更新相册中所有照片的整体分和已知性
     /// </summary>
-    private async Task UpdatePhotoScoresInAlbumAsync(Guid albumId)
+    private async Task UpdatePhotoScoresInAlbumAsync(string albumId)
     {
         var album = await _context.Albums
             .Include(a => a.Photos)

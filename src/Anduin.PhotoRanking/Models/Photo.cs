@@ -47,14 +47,14 @@ public class Photo
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     /// <summary>
-    /// 所属相册ID（文件夹路径）
+    /// 所属相册ID（目录相对路径）
     /// </summary>
-    public required Guid AlbumId { get; set; }
+    [MaxLength(500)]
+    public required string AlbumId { get; set; }
 
     // [规则 2.3, 2.4, 2.5, 2.6]
     // 导航引用：Album?, JsonIgnore, ForeignKey, NotNull
-    // 注意：AlbumId 是业务键（string），不是数据库外键
-    // 关系通过 Fluent API 配置（HasForeignKey + HasPrincipalKey）
+    // AlbumId 是string类型的外键，使用目录相对路径作为自然键
     [JsonIgnore]
     [ForeignKey(nameof(AlbumId))]
     [NotNull]

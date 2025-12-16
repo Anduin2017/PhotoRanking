@@ -33,7 +33,7 @@ public class AlbumsController : ControllerBase
     /// 获取相册详情
     /// </summary>
     [HttpGet("{albumId}")]
-    public async Task<ActionResult<object>> GetAlbum(Guid albumId)
+    public async Task<ActionResult<object>> GetAlbum(string albumId)
     {
         var album = await _context.Albums
             .Include(a => a.Photos)
@@ -61,7 +61,7 @@ public class AlbumsController : ControllerBase
     /// </summary>
     [HttpGet("{albumId}/photos")]
     public async Task<ActionResult<object>> GetAlbumPhotos(
-        Guid albumId,
+        string albumId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
         [FromQuery] string sortBy = "filePath")

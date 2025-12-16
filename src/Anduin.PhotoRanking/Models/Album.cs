@@ -6,7 +6,8 @@ namespace Anduin.PhotoRanking.Models;
 public class Album
 {
     [Key]
-    public required Guid AlbumId { get; set; }
+    [MaxLength(500)]
+    public required string AlbumId { get; set; }
 
     [MaxLength(200)]
     public required string Name { get; set; }

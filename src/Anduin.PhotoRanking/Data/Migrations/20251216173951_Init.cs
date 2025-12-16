@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Anduin.PhotoRanking.Migrations
+namespace Anduin.PhotoRanking.Data.Migrations
 {
     /// <inheritdoc />
     public partial class Init : Migration
@@ -15,7 +15,7 @@ namespace Anduin.PhotoRanking.Migrations
                 name: "Albums",
                 columns: table => new
                 {
-                    AlbumId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    AlbumId = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     AlbumScore = table.Column<double>(type: "REAL", nullable: false),
                     KnownRate = table.Column<double>(type: "REAL", nullable: false),
@@ -46,7 +46,7 @@ namespace Anduin.PhotoRanking.Migrations
                     ViewCount = table.Column<int>(type: "INTEGER", nullable: false),
                     LastRatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    AlbumId = table.Column<Guid>(type: "TEXT", nullable: false)
+                    AlbumId = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false)
                 },
                 constraints: table =>
                 {
