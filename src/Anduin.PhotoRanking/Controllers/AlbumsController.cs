@@ -86,7 +86,6 @@ public class AlbumsController : ControllerBase
             _ => query.OrderBy(p => p.FilePath) // 默认按文件名
         };
 
-        var totalCount = await _context.Photos.CountAsync(p => p.AlbumId == albumId);
         var photos = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

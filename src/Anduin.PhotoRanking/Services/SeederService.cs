@@ -127,7 +127,6 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
             // 处理当前相册的所有照片
             foreach (var photoFile in photoFiles)
             {
-                var fileName = Path.GetFileName(photoFile);
                 // 照片的相对路径是相对于根目录的
                 var relativePath = Path.GetRelativePath(rootPath, photoFile).Replace(Path.DirectorySeparatorChar, '/');
 

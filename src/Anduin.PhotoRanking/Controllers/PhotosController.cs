@@ -102,7 +102,7 @@ public class PhotosController : ControllerBase
             case "waiting": // 待打分：已知性最低
                 candidates = allPhotos
                     .OrderBy(p => p.Knownness)
-                    .ThenBy(p => Guid.NewGuid())
+                    .ThenBy(_ => Guid.NewGuid())
                     .Take(Math.Min(500, allPhotos.Count))
                     .ToList();
                 break;
@@ -234,7 +234,7 @@ public class PhotosController : ControllerBase
             photo.IsFixed,
             photo.ViewCount,
             photo.LastRatedAt,
-            Album = photo.Album,
+            photo.Album,
             AvgIndependentScore = avgIndependentScore,
             RatingHistory = photo.RatingLogs.OrderByDescending(r => r.RatedAt).Take(10)
         });

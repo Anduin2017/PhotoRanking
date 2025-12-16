@@ -1,10 +1,8 @@
 using Aiursoft.DbTools.Sqlite;
 using Aiursoft.WebTools.Abstractions.Models;
-using Anduin.PhotoRanking;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
 using Microsoft.AspNetCore.Mvc.Razor;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 

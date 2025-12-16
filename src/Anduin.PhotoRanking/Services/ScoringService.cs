@@ -7,12 +7,10 @@ namespace Anduin.PhotoRanking.Services;
 public class ScoringService
 {
     private readonly AppDbContext _context;
-    private readonly ILogger<ScoringService> _logger;
 
-    public ScoringService(AppDbContext context, ILogger<ScoringService> logger)
+    public ScoringService(AppDbContext context)
     {
         _context = context;
-        _logger = logger;
     }
 
     /// <summary>
