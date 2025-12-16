@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhotoRanking - 照片评分系统</title>
+    <meta name="description" content="专业的照片评分和管理系统，智能评分算法帮助您更好地组织和欣赏照片收藏">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                    <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+                <span class="logo-text">PhotoRanking</span>
+            </div>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-page="feed">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg>
+                    <span>首页</span>
+                </button>
+                <button class="nav-tab" data-page="discover">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <span>探索</span>
+                </button>
+                <button class="nav-tab" data-page="advanced">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"></path>
+                    </svg>
+                    <span>高级</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 首页 Feed -->
+            <div id="feed-page" class="page active">
+                <div class="page-header">
+                    <h1 class="page-title">首页</h1>
+                    <p class="page-subtitle">为您精选优质照片</p>
+                </div>
+                <div id="feed-container" class="feed-container">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- 探索页 Discover -->
+            <div id="discover-page" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">探索</h1>
+                    <p class="page-subtitle">发现更多精彩内容</p>
+                </div>
+
+                <!-- 模式选择器 -->
+                <div class="discover-mode-selector">
+                    <button class="mode-btn active" data-mode="waiting">
+                        <span class="mode-icon">📋</span>
+                        <span class="mode-label">待打分</span>
+                        <span class="mode-desc">最低已知性</span>
+                    </button>
+                    <button class="mode-btn" data-mode="consolidate">
+                        <span class="mode-icon">🎯</span>
+                        <span class="mode-label">巩固</span>
+                        <span class="mode-desc">中等已知性</span>
+                    </button>
+                    <button class="mode-btn" data-mode="enjoy">
+                        <span class="mode-icon">⭐</span>
+                        <span class="mode-label">享受</span>
+                        <span class="mode-desc">高分照片</span>
+                    </button>
+                </div>
+
+                <!-- 照片网格（3列瀑布流） -->
+                <div id="discover-grid" class="discover-photos-grid">
+                    <div class="loading-spinner"></div>
+                </div>
+
+                <!-- 加载更多指示器 -->
+                <div id="discover-loading-more" class="loading-more" style="display: none;">
+                    <div class="loading-spinner-small"></div>
+                    <span>加载更多...</span>
+                </div>
+            </div>
+
+            <!-- 高级页 Advanced -->
+            <div id="advanced-page" class="page">
+                <div class="page-header">
+                    <h1 class="page-title">高级统计</h1>
+                    <p class="page-subtitle">查看详细数据</p>
+                </div>
+                <div id="advanced-container" class="advanced-container">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- 相册详情页 -->
+            <div id="album-page" class="page">
+                <div class="page-header">
+                    <button id="back-from-album" class="back-button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M19 12H5M12 19l-7-7 7-7" />
+                        </svg>
+                        返回
+                    </button>
+                    <h1 id="album-title" class="page-title"></h1>
+                    <div id="album-stats" class="album-stats"></div>
+                </div>
+                <div id="album-photos-container" class="photo-grid">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 照片查看器 Modal -->
+        <div id="photo-viewer" class="photo-viewer">
+            <div class="viewer-overlay"></div>
+            <div class="viewer-content">
+                <button class="viewer-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+
+                <div class="viewer-image-container">
+                    <img id="viewer-image" src="" alt="">
+                </div>
+
+                <div class="viewer-info">
+                    <div class="viewer-album-info">
+                        <div class="album-info-left">
+                            <div class="album-name"></div>
+                            <div class="album-score-display">
+                                <span class="album-score-label">相册分:</span>
+                                <span class="album-score-value" id="viewer-album-score">-</span>
+                            </div>
+                        </div>
+                        <button class="btn-view-album">查看相册</button>
+                    </div>
+
+                    <!-- 评分界面（移到这里，不挡住照片） -->
+                    <div class="rating-overlay-bottom">
+                        <div class="rating-buttons">
+                            <button class="rating-btn" data-score="0">0</button>
+                            <button class="rating-btn" data-score="1">1</button>
+                            <button class="rating-btn" data-score="2">2</button>
+                            <button class="rating-btn" data-score="3">3</button>
+                            <button class="rating-btn" data-score="4">4</button>
+                            <button class="rating-btn" data-score="5">5</button>
+                        </div>
+                        <div class="rating-hint">键盘 0-5</div>
+                    </div>
+
+                    <div class="viewer-photo-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">整体分</span>
+                            <span class="stat-value" id="viewer-overall-score">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">独立分</span>
+                            <span class="stat-value" id="viewer-independent-score">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">已知性</span>
+                            <span class="stat-value" id="viewer-knownness">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">打分次数</span>
+                            <span class="stat-value" id="viewer-rating-count">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast通知 -->
+        <div id="toast-container"></div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+
+</html>
