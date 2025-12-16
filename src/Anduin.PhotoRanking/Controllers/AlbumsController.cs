@@ -32,9 +32,12 @@ public class AlbumsController : ControllerBase
     /// <summary>
     /// 获取相册详情
     /// </summary>
-    [HttpGet("{albumId}")]
+    [HttpGet("{*albumId}")]
     public async Task<ActionResult<object>> GetAlbum(string albumId)
     {
+        // URL解码albumId以支持包含斜杠的嵌套路径
+        albumId = Uri.UnescapeDataString(albumId);
+        
         var album = await _context.Albums
             .Include(a => a.Photos)
             .FirstOrDefaultAsync(a => a.AlbumId == albumId);

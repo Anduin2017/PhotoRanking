@@ -42,30 +42,41 @@ function updateStateFromURL() {
         return;
     }
     
-    // 解析hash
-    const parts = hash.split('/');
-    const page = parts[0];
-    
-    if (page === 'album' && parts[1]) {
-        // 格式: #album/123 或 #album/123/photo/456
-        const albumId = parts[1];
+    // 解析hash - 使用正则表达式而不是简单split，支持编码的albumId
+    const albumMatch = hash.match(/^album\/([^\/]+)(?:\/photo\/(\d+))?$/);
+    if (albumMatch) {
+        // 格式: #album/encoded-album-id 或 #album/encoded-album-id/photo/456
+        const albumId = decodeURIComponent(albumMatch[1]);
         viewAlbum(albumId).then(() => {
             // 如果URL中有photo参数，自动打开照片查看器
-            if (parts[2] === 'photo' && parts[3]) {
-                const photoId = parseInt(parts[3]);
+            if (albumMatch[2]) {
+                const photoId = parseInt(albumMatch[2]);
                 state.viewerContext = 'album'; // 确保context正确
                 openPhotoViewer(photoId);
             }
         });
-    } else if (page === 'discover') {
-        const mode = parts[1] || 'waiting';
+        return;
+    }
+    
+    // 解析discover路由: #discover/{mode} 或 #discover/{mode}/photo/{photoId}
+    const discoverMatch = hash.match(/^discover(?:\/(waiting|all|top))?(?:\/photo\/(\d+))?$/);
+    if (discoverMatch) {
+        const mode = discoverMatch[1] || 'waiting';
         switchPage('discover');
-        // 如果有指定模式，切换到该模式
-        if (parts[1]) {
-            switchDiscoverMode(mode);
+        switchDiscoverMode(mode);
+        // 如果URL中有photo参数，自动打开照片查看器
+        if (discoverMatch[2]) {
+            const photoId = parseInt(discoverMatch[2]);
+            state.viewerContext = 'discover';
+            // 延迟打开，等待页面加载完成
+            setTimeout(() => openPhotoViewer(photoId), 100);
         }
-    } else if (['feed', 'advanced'].includes(page)) {
-        switchPage(page);
+        return;
+    }
+    
+    // 其他简单页面路由
+    if (['feed', 'advanced'].includes(hash)) {
+        switchPage(hash);
     } else {
         // 无效hash，回到主页
         window.location.hash = 'feed';
@@ -76,7 +87,8 @@ function updateStateFromURL() {
 function updateURL(page, params = {}) {
     let hash = page;
     if (params.albumId) {
-        hash = `album/${params.albumId}`;
+        // 对albumId进行URL编码，支持包含斜杠的嵌套路径
+        hash = `album/${encodeURIComponent(params.albumId)}`;
     } else if (params.mode) {
         hash = `${page}/${params.mode}`;
     }
@@ -365,6 +377,9 @@ function switchDiscoverMode(mode) {
         btn.classList.toggle('active', btn.dataset.mode === mode);
     });
     
+    // 更新URL
+    window.history.replaceState(null, '', `#discover/${mode}`);
+    
     // 重新加载
     loadDiscover();
 }
@@ -602,7 +617,8 @@ async function viewAlbum(albumId) {
     photosContainer.innerHTML = '<div class="loading-spinner"></div>';
     
     try {
-        const response = await fetch(`${API_BASE}/albums/${albumId}`);
+        // 对albumId进行URL编码，支持包含斜杠的路径
+        const response = await fetch(`${API_BASE}/albums/${encodeURIComponent(albumId)}`);
         const data = await response.json();
         
         const album = data.album;
@@ -703,9 +719,13 @@ async function openPhotoViewer(photoId) {
             }
         });
         
-        // 更新URL（如果在相册中，添加photo参数以便分享）
+        // 更新URL根据context
         if (state.viewerContext === 'album' && state.currentAlbumId) {
-            window.history.replaceState(null, '', `#album/${state.currentAlbumId}/photo/${photoId}`);
+            window.history.replaceState(null, '', `#album/${encodeURIComponent(state.currentAlbumId)}/photo/${photoId}`);
+        } else if (state.viewerContext === 'discover') {
+            window.history.replaceState(null, '', `#discover/${discoverCurrentMode}/photo/${photoId}`);
+        } else if (state.viewerContext === 'feed') {
+            window.history.replaceState(null, '', `#feed/photo/${photoId}`);
         }
         
     } catch (error) {
@@ -718,9 +738,13 @@ async function openPhotoViewer(photoId) {
 function closePhotoViewer() {
     document.getElementById('photo-viewer').classList.remove('active');
     
-    // 如果在相册中，清除URL中的photo参数，回到相册页面
+    // 根据context清除URL中的photo参数
     if (state.viewerContext === 'album' && state.currentAlbumId) {
-        window.history.replaceState(null, '', `#album/${state.currentAlbumId}`);
+        window.history.replaceState(null, '', `#album/${encodeURIComponent(state.currentAlbumId)}`);
+    } else if (state.viewerContext === 'discover') {
+        window.history.replaceState(null, '', `#discover/${discoverCurrentMode}`);
+    } else if (state.viewerContext === 'feed') {
+        window.history.replaceState(null, '', `#feed`);
     }
     
     // 不做任何其他操作，保持当前页面状态
