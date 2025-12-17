@@ -1,5 +1,5 @@
 using Anduin.PhotoRanking.Data;
-using Anduin.PhotoRanking.Models;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
