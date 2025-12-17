@@ -20,10 +20,23 @@ public class AlbumsController : ControllerBase
     /// 获取所有相册
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<Album>>> GetAlbums()
+    public async Task<ActionResult<List<object>>> GetAlbums()
     {
         var albums = await _context.Albums
             .OrderByDescending(a => a.AlbumScore)
+            .Select(a => new
+            {
+                a.AlbumId,
+                a.Name,
+                a.AlbumScore,
+                a.KnownRate,
+                a.PhotoCount,
+                ThumbnailPath = a.Photos
+                    .OrderByDescending(p => p.IndependentScore)
+                    .ThenByDescending(p => p.OverallScore)
+                    .Select(p => p.FilePath)
+                    .FirstOrDefault()
+            })
             .ToListAsync();
 
         return Ok(albums);

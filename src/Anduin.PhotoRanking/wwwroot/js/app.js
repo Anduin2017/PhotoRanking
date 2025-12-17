@@ -32,6 +32,206 @@ function formatScore(score) {
     return score != null ? score.toFixed(2) : '-';
 }
 
+// ========== 浏览页功能 (Browser - File Explorer Style) ==========
+
+let browserState = {
+    currentPath: '',
+    cachedAlbums: [],
+    loaded: false
+};
+
+async function loadBrowser() {
+    const container = document.getElementById('browser-container');
+    
+    // 如果是第一次加载
+    if (!browserState.loaded) {
+        container.innerHTML = '<div class="loading-spinner"></div>';
+        try {
+            const response = await fetch(`${API_BASE}/albums`);
+            browserState.cachedAlbums = await response.json();
+            browserState.loaded = true;
+        } catch (error) {
+            console.error('Error loading browser:', error);
+            container.innerHTML = '<p style="text-align: center; color: red;">加载失败</p>';
+            return;
+        }
+    }
+    
+    renderBrowserView();
+}
+
+function renderBrowserView() {
+    const container = document.getElementById('browser-container');
+    const currentPath = browserState.currentPath;
+    
+    container.innerHTML = '';
+    
+    // 1. 面包屑导航
+    const breadcrumb = document.createElement('div');
+    breadcrumb.className = 'browser-breadcrumb';
+    
+    // Root link
+    const rootLink = document.createElement('span');
+    rootLink.className = `breadcrumb-item ${currentPath === '' ? 'active' : ''}`;
+    rootLink.textContent = 'Root';
+    rootLink.onclick = () => {
+        browserState.currentPath = '';
+        renderBrowserView();
+    };
+    breadcrumb.appendChild(rootLink);
+    
+    if (currentPath) {
+        const parts = currentPath.split('/');
+        let pathAccumulator = '';
+        
+        parts.forEach((part, index) => {
+            breadcrumb.appendChild(document.createTextNode(' / '));
+            
+            pathAccumulator += (index > 0 ? '/' : '') + part;
+            const myPath = pathAccumulator;
+            
+            const item = document.createElement('span');
+            item.className = `breadcrumb-item ${index === parts.length - 1 ? 'active' : ''}`;
+            item.textContent = part;
+            if (index !== parts.length - 1) {
+                item.onclick = () => {
+                    browserState.currentPath = myPath;
+                    renderBrowserView();
+                };
+            }
+            breadcrumb.appendChild(item);
+        });
+    }
+    container.appendChild(breadcrumb);
+    
+    // 2. 解析当前路径下的内容
+    const folders = new Map(); // 子文件夹 name -> fullPath
+    const albums = []; // 直接也是相册的
+    
+    browserState.cachedAlbums.forEach(album => {
+        const albumPath = album.albumId;
+        
+        // 检查这个相册是否在当前路径下
+        if (albumPath.startsWith(currentPath ? currentPath + '/' : '') || (currentPath === '' && !albumPath.includes('/'))) {
+             // 获取相对于当前路径的部分
+            const relativePath = currentPath ? albumPath.substring(currentPath.length + 1) : albumPath;
+            const parts = relativePath.split('/');
+            
+            if (parts.length === 1) {
+                // 如果只有一部分，说明这本身就是一个相册（但也可能包含子文件夹，但在这个层级它首先是相册）
+                // 暂时简单的逻辑：直接显示为相册
+                // 实际上，有些目录既有照片（是相册）又有子目录。
+                // 现有的逻辑是：只要里面有照片就是相册。
+                albums.push(album);
+            } else {
+                // 如果有多部分，说明在这个层级它属于一个文件夹
+                const folderName = parts[0];
+                const folderPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+                if (!folders.has(folderName)) {
+                    folders.set(folderName, folderPath);
+                }
+            }
+        } else if (albumPath === currentPath) {
+             // 这种情况一般不会发生，因为我们查看的是内容，除非当前路径本身就是叶子节点，那应该直接跳转了
+        }
+    });
+    
+    // 3. 渲染文件夹
+    if (folders.size > 0) {
+        const folderSection = document.createElement('div');
+        folderSection.className = 'browser-section';
+        folderSection.innerHTML = '<h3 class="browser-section-title">文件夹</h3>';
+        
+        const grid = document.createElement('div');
+        grid.className = 'browser-grid-folders';
+        
+        // 排序文件夹
+        const sortedFolders = Array.from(folders.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+        
+        sortedFolders.forEach(([name, path]) => {
+            const card = document.createElement('div');
+            card.className = 'folder-card';
+            card.innerHTML = `
+                <div class="folder-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <div class="folder-name">${name}</div>
+            `;
+            card.onclick = () => {
+                browserState.currentPath = path;
+                renderBrowserView();
+            };
+            grid.appendChild(card);
+        });
+        
+        folderSection.appendChild(grid);
+        container.appendChild(folderSection);
+    }
+    
+    // 4. 渲染相册
+    if (albums.length > 0) {
+        const albumSection = document.createElement('div');
+        albumSection.className = 'browser-section';
+        albumSection.innerHTML = '<h3 class="browser-section-title">相册</h3>';
+        
+        const grid = document.createElement('div');
+        grid.className = 'browser-grid-albums';
+        
+        // 排序相册
+        albums.sort((a, b) => a.name.localeCompare(b.name));
+        
+        albums.forEach(album => {
+            // 复用 createAlbumStatCard 但稍微修改样式或逻辑（这里重新写一个简化的）
+            const card = createBrowserAlbumCard(album);
+            grid.appendChild(card);
+        });
+        
+        albumSection.appendChild(grid);
+        container.appendChild(albumSection);
+    }
+    
+    if (folders.size === 0 && albums.length === 0) {
+        container.insertAdjacentHTML('beforeend', '<div class="browser-empty">此文件夹为空</div>');
+    }
+}
+
+function createBrowserAlbumCard(album) {
+    const card = document.createElement('div');
+    card.className = 'stat-card album-thumbnail-card browser-album-card';
+    
+    // 设置背景图（如果有）
+    if (album.thumbnailPath) {
+        card.style.backgroundImage = `url('${getImageUrl(album.thumbnailPath)}')`;
+    }
+    
+    card.innerHTML = `
+        <div class="album-card-overlay"></div>
+        <div class="album-card-content">
+            <div class="stat-card-title">
+                ${album.name}
+            </div>
+            <div class="album-card-stats">
+                <div class="stat-item">
+                    <span class="stat-label">相册分</span>
+                    <span class="stat-value">${formatScore(album.albumScore)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">照片</span>
+                    <span class="stat-value">${album.photoCount}</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    card.onclick = () => {
+        viewAlbum(album.albumId);
+    };
+    
+    return card;
+}
+
 // ========== URL路由功能 ==========
 
 // 从URL更新状态
@@ -75,7 +275,7 @@ function updateStateFromURL() {
     }
     
     // 其他简单页面路由
-    if (['feed', 'advanced'].includes(hash)) {
+    if (['feed', 'advanced', 'browser'].includes(hash)) {
         switchPage(hash);
     } else {
         // 无效hash，回到主页
@@ -133,6 +333,9 @@ function switchPage(pageName) {
             break;
         case 'advanced':
             loadAdvanced();
+            break;
+        case 'browser':
+            loadBrowser();
             break;
     }
     
