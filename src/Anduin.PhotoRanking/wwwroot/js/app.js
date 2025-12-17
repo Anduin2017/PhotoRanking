@@ -258,7 +258,10 @@ function createFeedCard(photo) {
         <img src="${getImageUrl(photo.filePath)}" alt="" class="feed-card-image" loading="lazy">
         <div class="feed-card-info">
             <div class="feed-card-album">
-                <a href="#" class="album-link" data-album-id="${photo.albumId}">${photo.album?.name || photo.albumId}</a>
+                <a href="#" class="album-link" data-album-id="${photo.albumId}">
+                    <span>${photo.album?.name || photo.albumId}</span>
+                    <span style="font-size: 0.8em; opacity: 0.6; margin-left: 6px; font-weight: normal;">${photo.albumId}</span>
+                </a>
             </div>
             <div class="feed-card-rating">
                 <div class="rating-prompt-inline">为这张照片打分</div>
@@ -555,7 +558,10 @@ function createAlbumStatCard(album, label, value, suffix) {
     card.innerHTML = `
         <div class="album-card-overlay"></div>
         <div class="album-card-content">
-            <div class="stat-card-title">${album.name}</div>
+            <div class="stat-card-title">
+                ${album.name}
+                <div style="font-size: 0.7em; opacity: 0.6; font-weight: normal; margin-top: 2px; word-break: break-all;">${album.albumId}</div>
+            </div>
             <div class="album-card-stats">
                 <div class="stat-item">
                     <span class="stat-label">${label}</span>
@@ -624,7 +630,10 @@ async function viewAlbum(albumId) {
         const album = data.album;
         const photos = data.photos;
         
-        titleEl.textContent = album.name;
+        titleEl.innerHTML = `
+            ${album.name}
+            <div style="font-size: 0.4em; opacity: 0.6; font-weight: normal; margin-top: 5px;">${album.albumId}</div>
+        `;
         
         statsEl.innerHTML = `
             <div class="stat-badge">
@@ -692,7 +701,10 @@ async function openPhotoViewer(photoId) {
         document.getElementById('viewer-image').src = getImageUrl(data.filePath);
         
         // 更新相册信息
-        viewer.querySelector('.album-name').textContent = data.album?.name || data.albumId;
+        viewer.querySelector('.album-name').innerHTML = `
+            ${data.album?.name || data.albumId}
+            <span style="font-size: 0.8em; opacity: 0.6; margin-left: 8px; font-weight: normal;">${data.albumId}</span>
+        `;
         document.getElementById('viewer-album-score').textContent = data.album?.albumScore != null 
             ? formatScore(data.album.albumScore) 
             : '-';
