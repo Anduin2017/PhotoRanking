@@ -1,7 +1,7 @@
-aiur() { arg="$( cut -d ' ' -f 2- <<< "$@" )" && curl -sL https://gitlab.anduin.com/anduin/aiurscript/-/raw/master/$1.sh | sudo bash -s $arg; }
+aiur() { arg="$( cut -d ' ' -f 2- <<< "$@" )" && curl -sL https://gitlab.aiursoft.com/anduin/aiurscript/-/raw/master/$1.sh | sudo bash -s $arg; }
 
 app_name="photoRanking"
-repo_path="https://gitlab.anduin.com/anduin/photoRanking"
+repo_path="https://gitlab.aiursoft.com/anduin/photoRanking"
 proj_path="src/Anduin.PhotoRanking/Anduin.PhotoRanking.csproj"
 
 get_dll_name()
