@@ -120,12 +120,12 @@ deploy_docker_registry:
         - test
     script:
         - if [ "$CI_COMMIT_REF_NAME" = "master" ]; then TAG="latest"; else TAG="$CI_COMMIT_REF_NAME"; fi
-        - echo building image hub.anduin.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$TAG
-        - docker build . -t hub.anduin.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
-        - echo "Logging in to Docker Registry hub.anduin.com..."
-        - echo "$LOCAL_DOCKER_PASSWORD" | docker login hub.anduin.com -u "$LOCAL_DOCKER_USERNAME" --password-stdin
-        - docker save hub.anduin.com/${CI_PROJECT_NAMESPACE}/$CI_PROJECT_NAME:$TAG -o temp.tar
-        - regctl image import hub.anduin.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$TAG temp.tar
+        - echo building image hub.aiursoft.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$TAG
+        - docker build . -t hub.aiursoft.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+        - echo "Logging in to Docker Registry hub.aiursoft.com..."
+        - echo "$LOCAL_DOCKER_PASSWORD" | docker login hub.aiursoft.com -u "$LOCAL_DOCKER_USERNAME" --password-stdin
+        - docker save hub.aiursoft.com/${CI_PROJECT_NAMESPACE}/$CI_PROJECT_NAME:$TAG -o temp.tar
+        - regctl image import hub.aiursoft.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$TAG temp.tar
         - rm ./temp.tar
     rules:
         - if: '$CI_COMMIT_BRANCH == "master"'

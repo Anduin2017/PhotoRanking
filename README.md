@@ -1,31 +1,21 @@
 # PhotoRanking - A sample project
 
-[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.anduin.com/anduin/photoRanking/-/blob/master/LICENSE)
-[![Pipeline stat](https://gitlab.anduin.com/anduin/photoRanking/badges/master/pipeline.svg)](https://gitlab.anduin.com/anduin/photoRanking/-/pipelines)
-[![Test Coverage](https://gitlab.anduin.com/anduin/photoRanking/badges/master/coverage.svg)](https://gitlab.anduin.com/anduin/photoRanking/-/pipelines)
-[![Man hours](https://manhours.anduin.com/r/gitlab.anduin.com/anduin/photoRanking.svg)](https://manhours.anduin.com/r/gitlab.anduin.com/anduin/photoRanking.html)
-[![Website](https://img.shields.io/website?url=https%3A%2F%2FphotoRanking.anduin.com)](https://photoRanking.anduin.com)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/blob/master/LICENSE)
+[![Pipeline stat](https://gitlab.aiursoft.com/anduin/photoRanking/badges/master/pipeline.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/pipelines)
+[![Test Coverage](https://gitlab.aiursoft.com/anduin/photoRanking/badges/master/coverage.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/pipelines)
+[![Man hours](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoRanking.svg)](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoRanking.html)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2FphotoRanking.aiursoft.com)](https://photoRanking.aiursoft.com)
 [![Docker](https://img.shields.io/docker/pulls/anduin/photoRanking.svg)](https://hub.docker.com/r/anduin/photoRanking)
 
-PhotoRanking is a sample project.
+PhotoRanking is a simple web application that allows users to upload photos and have others rank them. It is built using ASP.NET Core and Entity Framework Core, with a SQLite database for data storage.
 
 ![screenshot](./screenshot.png)
 
 Default user name is `admin@default.com` and default password is `admin123`.
 
-## Projects using Anduin PhotoRanking
-
-* [Stathub](https://gitlab.anduin.com/anduin/stathub)
-* [MarkToHtml](https://gitlab.anduin.com/anduin/marktohtml)
-* [MusicTools](https://gitlab.anduin.com/anduin/musictools)
-* [AnduinOS Home](https://gitlab.anduin.com/anduin/AnduinOS-Home)
-* [Manhours](https://gitlab.anduin.com/anduin/manhours)
-* [Tracer](https://gitlab.anduin.com/anduin/tracer)
-* [Warp](https://gitlab.anduin.com/anduin/warp)
-
 ## Try
 
-Try a running PhotoRanking [here](https://photoRanking.anduin.com).
+Try a running PhotoRanking [here](https://photoRanking.aiursoft.com).
 
 ## Run in Ubuntu
 
@@ -34,13 +24,13 @@ The following script will install\update this app on your Ubuntu server. Support
 On your Ubuntu server, run the following command:
 
 ```bash
-curl -sL https://gitlab.anduin.com/anduin/photoRanking/-/raw/master/install.sh | sudo bash
+curl -sL https://gitlab.aiursoft.com/anduin/photoRanking/-/raw/master/install.sh | sudo bash
 ```
 
 Of course it is suggested that append a custom port number to the command:
 
 ```bash
-curl -sL https://gitlab.anduin.com/anduin/photoRanking/-/raw/master/install.sh | sudo bash -s 8080
+curl -sL https://gitlab.aiursoft.com/anduin/photoRanking/-/raw/master/install.sh | sudo bash -s 8080
 ```
 
 It will install the app as a systemd service, and start it automatically. Binary files will be located at `/opt/apps`. Service files will be located at `/etc/systemd/system`.
