@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Photo, PhotoService } from '../../services/photo';
 import Swiper from 'swiper';
 import { Navigation, Virtual } from 'swiper/modules';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-photo-viewer',
@@ -21,7 +22,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
 
-  constructor(public photoService: PhotoService) { }
+  constructor(public photoService: PhotoService, private router: Router) { }
 
   ngOnInit() {
     // Swiper init happens in ngAfterViewInit
@@ -40,9 +41,6 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   initSwiper() {
     if (!this.swiperContainer) return;
 
-    // RE-DOING the configuration to match the successful vanilla JS implementation EXACTLY
-    // The previous swiper initialization was incomplete and commented out.
-    // If a swiper instance already exists, destroy it before creating a new one.
     if (this.swiper) {
       this.swiper.destroy();
     }
@@ -103,6 +101,11 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.photoService.ratePhoto(this.currentPhoto.id, score).subscribe({
       next: (updatedPhoto) => {
+        // Preserve album if missing
+        if (!updatedPhoto.album && this.currentPhoto?.album) {
+          updatedPhoto.album = this.currentPhoto.album;
+        }
+
         this.currentPhoto = updatedPhoto;
         // Optionally update the photo in the list if reference is shared or find it by ID
         const index = this.photos.findIndex(p => p.id === updatedPhoto.id);
@@ -112,6 +115,20 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: (err) => console.error(err)
     });
+  }
+
+  isRated(score: number): boolean {
+    if (!this.currentPhoto || this.currentPhoto.independentScore == null) {
+      return false;
+    }
+    return Math.round(this.currentPhoto.independentScore) === score;
+  }
+
+  openAlbum() {
+    if (this.currentPhoto) {
+      this.onClose();
+      this.router.navigate(['/album', this.currentPhoto.albumId]);
+    }
   }
 
   @HostListener('window:keydown', ['$event'])

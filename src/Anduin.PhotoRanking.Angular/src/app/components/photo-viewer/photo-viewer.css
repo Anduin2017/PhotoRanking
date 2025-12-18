@@ -139,3 +139,22 @@
     border-color: var(--primary);
     transform: translateY(-2px);
 }
+
+.rating-btn.last-rated {
+    background: transparent;
+    border-color: #ffd700; /* Gold */
+    color: #ffd700;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.rating-btn.rated {
+    animation: pulse 0.4s ease;
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}

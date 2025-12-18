@@ -16,7 +16,7 @@
     </button>
 
     <div class="viewer-info" style="position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 10;" *ngIf="currentPhoto" (click)="$event.stopPropagation()">
-        <div class="viewer-album-info">
+        <div class="viewer-album-info" (click)="openAlbum()" style="cursor: pointer;">
             <div class="album-info-left">
                 <div class="album-name" *ngIf="currentPhoto.album">
                     {{ currentPhoto.album.name }}
@@ -49,7 +49,7 @@
         </div>
 
         <div class="viewer-rating">
-            <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)">
+            <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
                 {{ score }}
             </button>
         </div>

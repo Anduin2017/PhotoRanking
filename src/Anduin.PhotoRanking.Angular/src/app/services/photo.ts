@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, Subject, tap } from 'rxjs';
 
 export interface Album {
   albumId: string;
@@ -39,10 +39,12 @@ export interface AlbumDetails {
 export class PhotoService {
   private apiBase = '/api';
 
+  public ratingChanged$ = new Subject<void>();
+
   constructor(private http: HttpClient) { }
 
   getImageUrl(filePath: string): string {
-    return `${this.apiBase}/images/${filePath}`;
+    return `${this.apiBase}/images/${encodeURI(filePath)}`;
   }
 
   getFeed(page: number, pageSize: number): Observable<Photo[]> {
@@ -54,7 +56,9 @@ export class PhotoService {
   }
 
   ratePhoto(id: number, score: number): Observable<Photo> {
-    return this.http.post<Photo>(`${this.apiBase}/photos/${id}/rate`, { score });
+    return this.http.post<Photo>(`${this.apiBase}/photos/${id}/rate`, { score }).pipe(
+      tap(() => this.ratingChanged$.next())
+    );
   }
 
   viewPhoto(id: number): Observable<void> {
@@ -76,5 +80,9 @@ export class PhotoService {
 
   getTopStats(): Observable<any> {
     return this.http.get<any>(`${this.apiBase}/photos/stats/top`);
+  }
+
+  getMoreStats(endpoint: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiBase}/${endpoint}`);
   }
 }

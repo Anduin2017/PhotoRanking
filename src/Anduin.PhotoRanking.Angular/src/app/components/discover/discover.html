@@ -5,15 +5,15 @@
             <div class="mode-label">待评</div>
             <div class="mode-desc">随机探索未评分照片</div>
         </button>
-        <button class="mode-btn" [class.active]="mode === 'all'" (click)="setMode('all')">
-            <div class="mode-icon">🔍</div>
-            <div class="mode-label">所有</div>
-            <div class="mode-desc">浏览库中所有照片</div>
+        <button class="mode-btn" [class.active]="mode === 'consolidate'" (click)="setMode('consolidate')">
+            <div class="mode-icon">🔨</div>
+            <div class="mode-label">巩固</div>
+            <div class="mode-desc">对既有评分进行微调</div>
         </button>
-        <button class="mode-btn" [class.active]="mode === 'top'" (click)="setMode('top')">
-            <div class="mode-icon">⭐</div>
-            <div class="mode-label">精选</div>
-            <div class="mode-desc">按分数排名的佳作</div>
+        <button class="mode-btn" [class.active]="mode === 'enjoy'" (click)="setMode('enjoy')">
+            <div class="mode-icon">☕</div>
+            <div class="mode-label">享受</div>
+            <div class="mode-desc">欣赏高分精选佳作</div>
         </button>
     </div>
 

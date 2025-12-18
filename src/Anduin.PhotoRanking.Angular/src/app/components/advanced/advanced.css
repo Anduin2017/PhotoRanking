@@ -1,8 +1,173 @@
 /* 高级统计页 */
 .advanced-container {
-    padding-top: 2rem;
+    padding-top: 1rem;
+    padding-bottom: 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4rem;
 }
 
+.stat-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.stat-section-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    position: relative;
+    padding-left: 1rem;
+}
+
+.stat-section-title::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: var(--gradient-primary);
+    border-radius: 2px;
+}
+
+/* Album Card Grid */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+/* New Album Card Style with Thumbnail Background */
+.stat-card {
+    /* Base styles replaced by specific classes if needed,
+       but here we mainly use .album-thumbnail-card structure */
+}
+
+.album-thumbnail-card {
+    position: relative;
+    height: 180px;
+    border-radius: 16px;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-card);
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    border: 1px solid var(--border);
+}
+
+.album-thumbnail-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    border-color: var(--primary);
+}
+
+.album-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 100%);
+    z-index: 1;
+}
+
+.album-card-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.25rem;
+    z-index: 2;
+}
+
+.stat-card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.75rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.album-card-stats {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+}
+
+.stat-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-light);
+}
+
+/* Photo Grid */
+.photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.photo-grid-item {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    background: var(--bg-card);
+    transition: all 0.3s ease;
+}
+
+.photo-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.photo-grid-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+}
+
+.photo-grid-item:hover img {
+    transform: scale(1.05);
+}
+
+/* Load More */
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding-top: 1rem;
+}
+
+/* Media Queries */
+@media (max-width: 768px) {
+    .photo-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2px;
+    }
+
+    .photo-grid-item {
+        border-radius: 0;
+    }
+}
 .section-title {
     font-size: 1.5rem;
     font-weight: 800;

@@ -33,7 +33,7 @@
             <div class="browser-grid-albums">
                 <div *ngFor="let album of albums"
                      class="stat-card album-thumbnail-card browser-album-card"
-                     [style.backgroundImage]="album.thumbnailPath ? 'url(' + photoService.getImageUrl(album.thumbnailPath) + ')' : ''"
+                     [style.backgroundImage]="album.thumbnailPath ? 'url(\'' + photoService.getImageUrl(album.thumbnailPath) + '\')' : ''"
                      (click)="openAlbum(album.albumId)">
 
                     <div class="album-card-overlay"></div>
