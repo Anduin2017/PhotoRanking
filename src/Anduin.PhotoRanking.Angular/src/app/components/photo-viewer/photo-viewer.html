@@ -48,6 +48,12 @@
             </div>
         </div>
 
+        <div class="viewer-rating">
+            <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)">
+                {{ score }}
+            </button>
+        </div>
+
         <!-- Rating buttons here if needed, or keeping it separate as in original overlay -->
     </div>
 </div>

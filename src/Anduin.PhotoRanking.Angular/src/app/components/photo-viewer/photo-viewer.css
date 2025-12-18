@@ -115,3 +115,27 @@
 .swiper-zoom-target {
     /* Styles inline */
 }
+/* Rating Controls in Viewer */
+.viewer-rating {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.rating-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.rating-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}

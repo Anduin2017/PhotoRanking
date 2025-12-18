@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Photo, PhotoService } from '../../services/photo';
 import Swiper from 'swiper';
@@ -92,5 +92,38 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onClose() {
     this.close.emit();
+  }
+
+  ratePhoto(score: number, event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (!this.currentPhoto) return;
+
+    this.photoService.ratePhoto(this.currentPhoto.id, score).subscribe({
+      next: (updatedPhoto) => {
+        this.currentPhoto = updatedPhoto;
+        // Optionally update the photo in the list if reference is shared or find it by ID
+        const index = this.photos.findIndex(p => p.id === updatedPhoto.id);
+        if (index !== -1) {
+          this.photos[index] = { ...this.photos[index], ...updatedPhoto };
+        }
+      },
+      error: (err) => console.error(err)
+    });
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  handleKeyboardEvent(event: KeyboardEvent) {
+    if (event.key === 'ArrowRight') {
+      this.swiper?.slideNext();
+    } else if (event.key === 'ArrowLeft') {
+      this.swiper?.slidePrev();
+    } else if (event.key === 'Escape') {
+      this.onClose();
+    } else if (event.key >= '0' && event.key <= '5') {
+      this.ratePhoto(parseInt(event.key));
+    }
   }
 }
