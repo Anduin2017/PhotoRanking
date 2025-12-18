@@ -1,0 +1,63 @@
+<div class="browser-container main-content">
+    <div *ngIf="isLoading" class="loading-spinner"></div>
+
+    <div *ngIf="!isLoading">
+        <!-- Breadcrumbs -->
+        <div class="browser-breadcrumb">
+            <span class="breadcrumb-item" [class.active]="currentPath === ''" (click)="navigate('')">Root</span>
+
+            <ng-container *ngFor="let part of breadcrumbParts; let last = last">
+                <span class="breadcrumb-separator"> / </span>
+                <span class="breadcrumb-item" [class.active]="last" (click)="!last && navigate(part.path)">{{ part.name }}</span>
+            </ng-container>
+        </div>
+
+        <!-- Folders -->
+        <div *ngIf="folders.length > 0" class="browser-section">
+            <h3 class="browser-section-title">文件夹</h3>
+            <div class="browser-grid-folders">
+                <div *ngFor="let folder of folders" class="folder-card" (click)="navigate(folder.fullPath)">
+                    <div class="folder-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="folder-name">{{ folder.name }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Albums -->
+        <div *ngIf="albums.length > 0" class="browser-section">
+            <h3 class="browser-section-title">相册</h3>
+            <div class="browser-grid-albums">
+                <div *ngFor="let album of albums"
+                     class="stat-card album-thumbnail-card browser-album-card"
+                     [style.backgroundImage]="album.thumbnailPath ? 'url(' + photoService.getImageUrl(album.thumbnailPath) + ')' : ''"
+                     (click)="openAlbum(album.albumId)">
+
+                    <div class="album-card-overlay"></div>
+                    <div class="album-card-content">
+                        <div class="stat-card-title">
+                            {{ album.name }}
+                        </div>
+                        <div class="album-card-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">相册分</span>
+                                <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">照片</span>
+                                <span class="stat-value">{{ album.photoCount }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div *ngIf="folders.length === 0 && albums.length === 0" class="browser-empty">
+            此文件夹为空
+        </div>
+    </div>
+</div>

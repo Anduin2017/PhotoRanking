@@ -1,0 +1,42 @@
+<div class="feed-container">
+    <div *ngFor="let photo of photos" class="feed-card">
+        <img [src]="photoService.getImageUrl(photo.filePath)" class="feed-card-image" loading="lazy" (click)="openViewer(photo.id)">
+        <div class="feed-card-info">
+            <div class="feed-card-album">
+                <a class="album-link">
+                    <span>{{ photo.album?.name || photo.albumId }}</span>
+                    <span style="font-size: 0.8em; opacity: 0.6; margin-left: 6px; font-weight: normal;">{{ photo.albumId }}</span>
+                </a>
+            </div>
+
+            <div class="feed-card-rating">
+                <div class="rating-prompt-inline">为这张照片打分</div>
+                <div class="rating-buttons-inline">
+                    <button *ngFor="let score of [0,1,2,3,4,5]"
+                            class="rating-btn-inline"
+                            (click)="onRate(photo, score, $event)">
+                        {{ score }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div *ngIf="isLoading" class="loading-indicator">
+        <div class="loading-spinner"></div><p>加载中...</p>
+    </div>
+
+    <div *ngIf="!hasMore && photos.length > 0" style="text-align: center; color: var(--text-secondary); padding: 20px;">
+        没有更多照片了
+    </div>
+
+    <div *ngIf="!isLoading && photos.length === 0" style="text-align: center; color: var(--text-secondary); padding: 50px;">
+        暂无照片，请先运行数据同步
+    </div>
+</div>
+
+<app-photo-viewer *ngIf="viewerOpen"
+                  [startPhotoId]="initialPhotoId"
+                  [photos]="photos"
+                  (close)="closeViewer()">
+</app-photo-viewer>

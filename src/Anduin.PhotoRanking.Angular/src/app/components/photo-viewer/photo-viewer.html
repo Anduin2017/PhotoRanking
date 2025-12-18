@@ -1,0 +1,53 @@
+<div class="photo-viewer active">
+    <div class="viewer-overlay" (click)="onClose()"></div>
+
+    <!-- Swiper Container -->
+    <div class="swiper" #swiperContainer style="width: 100%; height: 100%;">
+        <div class="swiper-wrapper">
+             <!-- Slides injected by Swiper Virtual -->
+        </div>
+    </div>
+
+    <button class="viewer-close" (click)="onClose()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
+
+    <div class="viewer-info" style="position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 10;" *ngIf="currentPhoto" (click)="$event.stopPropagation()">
+        <div class="viewer-album-info">
+            <div class="album-info-left">
+                <div class="album-name" *ngIf="currentPhoto.album">
+                    {{ currentPhoto.album.name }}
+                    <span style="font-size: 0.8em; opacity: 0.6; margin-left: 8px; font-weight: normal;">{{ currentPhoto.albumId }}</span>
+                </div>
+                <div class="album-score" *ngIf="currentPhoto.album">
+                    相册分: <span>{{ currentPhoto.album.albumScore | number:'1.2-2' }}</span>
+                </div>
+            </div>
+            <!-- View Album logic could be added here, emitting an event -->
+        </div>
+
+        <div class="viewer-stats">
+            <div class="stat-badge">
+                <span class="stat-badge-label">综合评分</span>
+                <span class="stat-badge-value">{{ currentPhoto.overallScore | number:'1.2-2' }}</span>
+            </div>
+            <div class="stat-badge">
+                <span class="stat-badge-label">独立评分</span>
+                <span class="stat-badge-value">{{ currentPhoto.independentScore != null ? (currentPhoto.independentScore | number:'1.2-2') : '-' }}</span>
+            </div>
+            <div class="stat-badge">
+                <span class="stat-badge-label">已知度</span>
+                <span class="stat-badge-value">{{ currentPhoto.knownness | number:'1.2-2' }}</span>
+            </div>
+             <div class="stat-badge">
+                <span class="stat-badge-label">评分数</span>
+                <span class="stat-badge-value">{{ currentPhoto.ratingCount }}</span>
+            </div>
+        </div>
+
+        <!-- Rating buttons here if needed, or keeping it separate as in original overlay -->
+    </div>
+</div>

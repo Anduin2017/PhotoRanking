@@ -1,0 +1,108 @@
+/* Album Page Styles */
+.album-header {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.album-title-section {
+    margin-bottom: 1.5rem;
+}
+
+.album-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.album-meta {
+    font-family: monospace;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.album-stats-row {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.stat-badge-large {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-badge-large .label {
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.stat-badge-large .value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Reusing grid styles from discover.css globally or importing them?
+   Angular default view encapsulation isolates styles.
+   We should probably move common grid styles to styles.css or copy them here.
+   For Safety, I will copy relevant grid styles here as well to ensure it works isolated.
+*/
+
+.discover-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Adjusted for album view */
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.discover-item {
+    aspect-ratio: 1;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.discover-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+}
+
+.discover-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.discover-item-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    padding: 1rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.discover-item:hover .discover-item-overlay {
+    opacity: 1;
+}
+
+.discover-item-score {
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+}

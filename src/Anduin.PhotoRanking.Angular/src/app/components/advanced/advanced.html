@@ -1,0 +1,44 @@
+<div class="advanced-container main-content">
+    <div *ngIf="isLoading" class="loading-spinner"></div>
+
+    <div *ngIf="!isLoading && stats">
+        <h2 class="section-title">🏆 最佳相册排行</h2>
+
+        <div class="stats-grid">
+            <div *ngFor="let album of stats.topAlbums" class="stat-card">
+                <div class="stat-card-title">{{ album.name }}</div>
+                <div class="stat-items">
+                     <div class="stat-item">
+                        <span class="label">平均分</span>
+                        <span class="value top-score">{{ album.albumScore | number:'1.2-2' }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">最高分</span>
+                        <span class="value">{{ album.highestScore | number:'1.2-2' }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">照片数</span>
+                        <span class="value">{{ album.photoCount }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 3rem;">📸 最佳照片 Top 10</h2>
+
+        <div class="top-photos-list">
+             <div *ngFor="let photo of stats.topPhotos; let i = index" class="top-photo-item">
+                 <div class="rank-number" [class.rank-1]="i==0" [class.rank-2]="i==1" [class.rank-3]="i==2">
+                     {{ i + 1 }}
+                 </div>
+                 <div class="top-photo-thumb">
+                     <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
+                 </div>
+                 <div class="top-photo-info">
+                     <div class="top-photo-score">{{ photo.overallScore | number:'1.2-2' }}</div>
+                     <div class="top-photo-album">{{ photo.albumId }}</div>
+                 </div>
+             </div>
+        </div>
+    </div>
+</div>
