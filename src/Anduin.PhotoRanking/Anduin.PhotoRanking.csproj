@@ -21,4 +21,17 @@
     </PackageReference>
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
+  <Target Name="NpmInstall" AfterTargets="Restore">
+    <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
+    <Exec Command="npm install" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
+  </Target>
+
+  <Target Name="AngularBuild" BeforeTargets="Build">
+    <Message Importance="high" Text="Building Angular application..." />
+    <Exec Command="npm run build" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
+    <ItemGroup>
+      <AngularBuildFiles Include="../Anduin.PhotoRanking.Angular/dist/Anduin.PhotoRanking.Angular/browser/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AngularBuildFiles)" DestinationFolder="wwwroot/%(RecursiveDir)" />
+  </Target>
 </Project>
