@@ -35,4 +35,3 @@
     <Copy SourceFiles="@(AngularBuildFiles)" DestinationFolder="wwwroot/%(RecursiveDir)" />
   </Target>
 </Project>
-</Project>
