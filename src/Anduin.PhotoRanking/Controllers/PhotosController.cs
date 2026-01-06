@@ -121,36 +121,8 @@ public class PhotosController : ControllerBase
                 }
                 break;
 
-            case "enjoy": // 享受：整体分越高越好
-                // 只显示被评分过的照片（排除默认2.5分）
-                // 第1优先级：高分照片（>3.5且被评分过）
-                candidates = allPhotos
-                    .Where(p => p.OverallScore > 3.5 && p.RatingCount > 0)
-                    .ToList();
-
-                // 第2优先级：中高分照片（>3.0且被评分过）
-                if (candidates.Count < 100)
-                {
-                    candidates = allPhotos
-                        .Where(p => p.OverallScore > 3.0 && p.RatingCount > 0)
-                        .ToList();
-                }
-
-                // 第3优先级：所有被评分过的照片，按分数降序
-                if (candidates.Count < 50)
-                {
-                    candidates = allPhotos
-                        .Where(p => p.RatingCount > 0)
-                        .OrderByDescending(p => p.OverallScore)
-                        .ToList();
-                }
-
-                // 如果用户还没评分过任何照片，显示提示
-                if (candidates.Count == 0)
-                {
-                    // 返回空列表，前端会显示"暂无照片"
-                    return Ok(new List<Photo>());
-                }
+            case "enjoy": // 享受：所有照片参与轮转
+                candidates = allPhotos;
                 break;
 
             default:
@@ -188,8 +160,8 @@ public class PhotosController : ControllerBase
             }
             else // enjoy
             {
-                // 享受：整体分的3次方
-                photo = _scoringService.WeightedRandomSelect(candidates, p => Math.Pow(Math.Max(0.1, p.OverallScore), 3));
+                // 享受：按照片最终分数的平方关系来计算
+                photo = _scoringService.WeightedRandomSelect(candidates, p => Math.Pow(p.OverallScore, 2));
             }
 
             selectedPhotos.Add(photo);
