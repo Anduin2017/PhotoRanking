@@ -28,6 +28,7 @@
 
   <Target Name="AngularBuild" BeforeTargets="Build">
     <Message Importance="high" Text="Building Angular application..." />
+    <Exec Command="npm install" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
     <Exec Command="npm run build" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
     <ItemGroup>
       <AngularBuildFiles Include="../Anduin.PhotoRanking.Angular/dist/Anduin.PhotoRanking.Angular/browser/**/*" />
