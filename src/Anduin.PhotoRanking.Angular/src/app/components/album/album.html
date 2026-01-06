@@ -26,6 +26,19 @@
         </div>
     </div>
 
+    <!-- Album Actions -->
+    <div class="album-actions">
+        <div class="sort-control">
+            <span class="sort-label">排序:</span>
+            <select [value]="sortBy" (change)="onSortChange($any($event.target).value)" class="sort-select">
+                <option value="filename">文件名</option>
+                <option value="score">最高分</option>
+                <option value="unrated">未打分优先</option>
+                <option value="rated">已打分优先</option>
+            </select>
+        </div>
+    </div>
+
     <!-- Photos Grid -->
     <div class="discover-photos-grid">
         <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
