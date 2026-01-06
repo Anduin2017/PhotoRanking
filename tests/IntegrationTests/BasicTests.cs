@@ -83,4 +83,28 @@ public class BasicTests
         var content = await response.Content.ReadAsStringAsync();
         Assert.IsNotNull(content, "Response content should not be null");
     }
+
+    [TestMethod]
+    public async Task GetAlbumWithSorting()
+    {
+        // First get all albums to get a valid albumId
+        var albumsResponse = await _http.GetAsync("/api/albums");
+        albumsResponse.EnsureSuccessStatusCode();
+        var albumsContent = await albumsResponse.Content.ReadAsStringAsync();
+        var albums = Newtonsoft.Json.JsonConvert.DeserializeObject<List<dynamic>>(albumsContent);
+        
+        if (albums != null && albums.Count > 0)
+        {
+            string albumId = albums[0].albumId;
+            var sorts = new[] { "filename", "score", "rated", "unrated", "independentscore" };
+            
+            foreach (var sort in sorts)
+            {
+                var response = await _http.GetAsync($"/api/albums/{Uri.EscapeDataString(albumId)}?sortBy={sort}");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                Assert.IsNotNull(content);
+            }
+        }
+    }
 }
