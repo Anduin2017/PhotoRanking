@@ -32,7 +32,7 @@ public class AlbumsController : ControllerBase
                 a.KnownRate,
                 a.PhotoCount,
                 ThumbnailPath = a.Photos
-                    .OrderByDescending(p => p.IndependentScore)
+                    .OrderByDescending(p => p.IndependentScore ?? -1)
                     .ThenByDescending(p => p.OverallScore)
                     .Select(p => p.FilePath)
                     .FirstOrDefault()
@@ -50,7 +50,7 @@ public class AlbumsController : ControllerBase
     {
         // URL解码albumId以支持包含斜杠的嵌套路径
         albumId = Uri.UnescapeDataString(albumId);
-        
+
         var album = await _context.Albums
             .Include(a => a.Photos)
             .FirstOrDefaultAsync(a => a.AlbumId == albumId);
@@ -138,6 +138,13 @@ public class AlbumsController : ControllerBase
                 .ThenByDescending(p => p.OverallScore)
                 .FirstOrDefaultAsync();
 
+            if (topPhoto == null)
+            {
+                topPhoto = await _context.Photos
+                    .Where(p => p.AlbumId == album.AlbumId)
+                    .FirstOrDefaultAsync();
+            }
+
             result.Add(new
             {
                 album.AlbumId,
@@ -172,6 +179,13 @@ public class AlbumsController : ControllerBase
                 .OrderByDescending(p => p.IndependentScore)
                 .ThenByDescending(p => p.OverallScore)
                 .FirstOrDefaultAsync();
+
+            if (topPhoto == null)
+            {
+                topPhoto = await _context.Photos
+                    .Where(p => p.AlbumId == album.AlbumId)
+                    .FirstOrDefaultAsync();
+            }
 
             result.Add(new
             {

@@ -1,0 +1,93 @@
+<div class="advanced-container main-content">
+    <div *ngIf="isLoading" class="loading-spinner"></div>
+
+    <div *ngIf="!isLoading && stats">
+        <!-- 1. Top Albums by Score -->
+        <div class="stat-section">
+            <h2 class="stat-section-title">相册分最高的相册</h2>
+            <div class="stat-grid">
+                <div *ngFor="let album of stats.topAlbumsByScore" class="stat-card album-thumbnail-card"
+                     [style.backgroundImage]="album.thumbnailPath ? 'url(\'' + photoService.getImageUrl(album.thumbnailPath) + '\')' : ''"
+                     (click)="openAlbum(album.albumId)">
+                    <div class="album-card-overlay"></div>
+                    <div class="album-card-content">
+                        <div class="stat-card-title">
+                            {{ album.name }}
+                            <div style="font-size: 0.7em; opacity: 0.6; font-weight: normal; margin-top: 2px; word-break: break-all;">{{ album.albumId }}</div>
+                        </div>
+                        <div class="album-card-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">相册分</span>
+                                <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">照片</span>
+                                <span class="stat-value">{{ album.photoCount }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="load-more-container">
+                <button class="load-more-btn" (click)="loadMore('albumScore')">Load More</button>
+            </div>
+        </div>
+
+        <!-- 2. Top Albums by Known Rate -->
+        <div class="stat-section">
+            <h2 class="stat-section-title">已知率最高的相册</h2>
+            <div class="stat-grid">
+                <div *ngFor="let album of stats.topAlbumsByKnownRate" class="stat-card album-thumbnail-card"
+                     [style.backgroundImage]="album.thumbnailPath ? 'url(\'' + photoService.getImageUrl(album.thumbnailPath) + '\')' : ''"
+                     (click)="openAlbum(album.albumId)">
+                     <div class="album-card-overlay"></div>
+                     <div class="album-card-content">
+                        <div class="stat-card-title">
+                            {{ album.name }}
+                            <div style="font-size: 0.7em; opacity: 0.6; font-weight: normal; margin-top: 2px; word-break: break-all;">{{ album.albumId }}</div>
+                        </div>
+                        <div class="album-card-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">已知率</span>
+                                <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">照片</span>
+                                <span class="stat-value">{{ album.photoCount }}</span>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+            </div>
+            <div class="load-more-container">
+                <button class="load-more-btn" (click)="loadMore('albumKnownRate')">Load More</button>
+            </div>
+        </div>
+
+        <!-- 3. Top Photos by Score -->
+        <div class="stat-section">
+            <h2 class="stat-section-title">整体分最高的照片</h2>
+            <div class="photo-grid">
+                <div *ngFor="let photo of stats.topPhotosByScore" class="photo-grid-item" (click)="openViewer(photo.id)">
+                    <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
+                </div>
+            </div>
+            <div class="load-more-container">
+                <button class="load-more-btn" (click)="loadMore('photoScore')">Load More</button>
+            </div>
+        </div>
+
+        <!-- 4. Top Photos by Knownness -->
+        <div class="stat-section">
+            <h2 class="stat-section-title">已知性最高的照片</h2>
+            <div class="photo-grid">
+                <div *ngFor="let photo of stats.topPhotosByKnownness" class="photo-grid-item" (click)="openViewer(photo.id)">
+                    <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
+                </div>
+            </div>
+            <div class="load-more-container">
+                <button class="load-more-btn" (click)="loadMore('photoKnownness')">Load More</button>
+            </div>
+        </div>
+    </div>
+</div>

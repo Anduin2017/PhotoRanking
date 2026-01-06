@@ -1,0 +1,53 @@
+<div class="album-page-container main-content" *ngIf="!isLoading && album">
+    <!-- Album Header -->
+    <div class="album-header">
+        <div class="album-title-section">
+            <h1 class="album-title">{{ album.name }}</h1>
+            <div class="album-meta">{{ albumId }}</div>
+        </div>
+
+        <div class="album-stats-row">
+            <div class="stat-badge-large">
+                <span class="label">相册评分</span>
+                <span class="value">{{ album.albumScore | number:'1.2-2' }}</span>
+            </div>
+            <div class="stat-badge-large">
+                <span class="label">最高分</span>
+                <span class="value">{{ album.highestScore | number:'1.2-2' }}</span>  <!-- Assuming backend sends this, interface might need update -->
+            </div>
+             <div class="stat-badge-large">
+                <span class="label">已评分</span>
+                <span class="value">{{ album.knownRate * 100 | number:'1.0-1' }}%</span>
+            </div>
+             <div class="stat-badge-large">
+                <span class="label">照片数</span>
+                <span class="value">{{ album.photoCount }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photos Grid -->
+    <div class="discover-photos-grid">
+        <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
+            <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
+            <div class="discover-item-overlay">
+                <div class="discover-item-score">分数: {{ photo.overallScore | number:'1.2-2' }}</div>
+            </div>
+        </div>
+    </div>
+
+      <div *ngIf="photos.length === 0" style="text-align: center; color: var(--text-secondary); padding: 50px;">
+        相册为空
+    </div>
+
+</div>
+
+<div *ngIf="isLoading" class="loading-indicator">
+    <div class="loading-spinner"></div>
+</div>
+
+<app-photo-viewer *ngIf="viewerOpen"
+                  [startPhotoId]="initialPhotoId"
+                  [photos]="photos"
+                  (close)="closeViewer()">
+</app-photo-viewer>

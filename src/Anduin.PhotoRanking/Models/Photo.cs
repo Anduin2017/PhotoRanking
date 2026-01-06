@@ -64,4 +64,8 @@ public class Photo
     // 集合：IEnumerable (独裁模式), InverseProperty, new List()
     [InverseProperty(nameof(RatingLog.Photo))]
     public IEnumerable<RatingLog> RatingLogs { get; init; } = new List<RatingLog>();
+
+    public long FileSize { get; set; }
+
+    public DateTime LastModified { get; set; } = DateTime.UtcNow;
 }

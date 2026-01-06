@@ -38,13 +38,13 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
 
         // 递归扫描所有目录
         ScanDirectoryRecursive(
-            photoRootPath, 
-            photoRootPath, 
-            supportedExtensions, 
-            existingAlbumIds, 
-            existingPhotoPaths, 
-            albumsToAdd, 
-            photosToAdd, 
+            photoRootPath,
+            photoRootPath,
+            supportedExtensions,
+            existingAlbumIds,
+            existingPhotoPaths,
+            albumsToAdd,
+            photosToAdd,
             ref photosSkipped);
 
         // 批量插入（比逐个插入快得多）
@@ -73,6 +73,28 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
 
         logger.LogInformation("Seeding completed. Added: {Albums} albums, {Photos} photos. Skipped: {Skipped} photos",
             albumsToAdd.Count, photosToAdd.Count, photosSkipped);
+
+        // Update metadata for existing photos if missing
+        var photosMissingMetadata = await context.Photos
+            .Where(p => p.FileSize == 0)
+            .ToListAsync();
+
+        if (photosMissingMetadata.Count > 0)
+        {
+            logger.LogInformation("Updating metadata for {Count} existing photos...", photosMissingMetadata.Count);
+            foreach (var photo in photosMissingMetadata)
+            {
+                var fullPath = Path.Combine(photoRootPath, photo.FilePath);
+                if (File.Exists(fullPath))
+                {
+                    var fi = new FileInfo(fullPath);
+                    photo.FileSize = fi.Length;
+                    photo.LastModified = fi.LastWriteTimeUtc;
+                }
+            }
+            await context.SaveChangesAsync();
+            logger.LogInformation("Metadata updated.");
+        }
 
         // 更新相册统计
         if (albumsToAdd.Count > 0 || photosToAdd.Count > 0)
@@ -133,6 +155,7 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
                 // 使用HashSet快速检查，无需查询数据库
                 if (!existingPhotoPaths.Contains(relativePath))
                 {
+                    var fileInfo = new FileInfo(photoFile);
                     var newPhoto = new Photo
                     {
                         FilePath = relativePath,
@@ -143,7 +166,9 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
                         RatingCount = 0,
                         IsFixed = false,
                         ViewCount = 0,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow,
+                        FileSize = fileInfo.Length,
+                        LastModified = fileInfo.LastWriteTimeUtc
                     };
 
                     photosToAdd.Add(newPhoto);
@@ -161,13 +186,13 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
         foreach (var subdir in subdirectories)
         {
             ScanDirectoryRecursive(
-                subdir, 
-                rootPath, 
-                supportedExtensions, 
-                existingAlbumIds, 
-                existingPhotoPaths, 
-                albumsToAdd, 
-                photosToAdd, 
+                subdir,
+                rootPath,
+                supportedExtensions,
+                existingAlbumIds,
+                existingPhotoPaths,
+                albumsToAdd,
+                photosToAdd,
                 ref photosSkipped);
         }
     }

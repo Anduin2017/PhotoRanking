@@ -1,0 +1,122 @@
+/* Feed页面 */
+.feed-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.feed-card {
+    background: var(--bg-card);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.feed-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.feed-card-image {
+    width: 100%;
+    /* aspect-ratio: 1;  Removed to allow natural height if needed, original css had it */
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+}
+
+.feed-card-info {
+    padding: 1.5rem;
+}
+
+.feed-card-album {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.album-link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: color 0.3s ease;
+}
+
+.album-link:hover {
+    color: var(--primary-light);
+    text-decoration: underline;
+}
+
+/* Feed卡片评分区域 */
+.feed-card-rating {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.rating-prompt-inline {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.rating-buttons-inline {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.rating-btn-inline {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rating-btn-inline:hover {
+    background: var(--gradient-primary);
+    border-color: var(--primary);
+    transform: scale(1.1);
+    box-shadow: 0 0 15px var(--primary);
+}
+
+.loading-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    padding: 20px;
+}
+
+.loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

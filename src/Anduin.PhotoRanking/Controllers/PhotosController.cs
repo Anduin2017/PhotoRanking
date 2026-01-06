@@ -338,6 +338,13 @@ public class PhotosController : ControllerBase
                 .ThenByDescending(p => p.OverallScore)
                 .FirstOrDefaultAsync();
 
+            if (topPhoto == null)
+            {
+                topPhoto = await _context.Photos
+                    .Where(p => p.AlbumId == album.AlbumId)
+                    .FirstOrDefaultAsync();
+            }
+
             albumsWithThumbnails.Add(new
             {
                 album.AlbumId,
@@ -358,6 +365,13 @@ public class PhotosController : ControllerBase
                 .OrderByDescending(p => p.IndependentScore)
                 .ThenByDescending(p => p.OverallScore)
                 .FirstOrDefaultAsync();
+
+            if (topPhoto == null)
+            {
+                topPhoto = await _context.Photos
+                    .Where(p => p.AlbumId == album.AlbumId)
+                    .FirstOrDefaultAsync();
+            }
 
             albumsByScoreWithThumbnails.Add(new
             {
