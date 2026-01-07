@@ -52,7 +52,8 @@ public class PhotosController : ControllerBase
 
         // 加权：整体分高、浏览次数低的照片权重更高
         var selectedPhotos = new List<Photo>();
-        for (int i = 0; i < Math.Min(totalToSelect, photos.Count); i++)
+        var limit = Math.Min(totalToSelect, photos.Count);
+        for (int i = 0; i < limit; i++)
         {
             var photo = _scoringService.WeightedRandomSelect(photos, p =>
             {
@@ -63,8 +64,6 @@ public class PhotosController : ControllerBase
 
             selectedPhotos.Add(photo);
             photos.Remove(photo); // 避免重复
-
-            if (photos.Count == 0) break;
         }
 
         // 只返回当前页的照片
@@ -130,7 +129,6 @@ public class PhotosController : ControllerBase
         }
 
         // 使用加权随机选择
-        var selectedPhotos = new List<Photo>();
         var skip = (page - 1) * pageSize;
 
         // 如果候选照片不够，直接返回
@@ -139,38 +137,33 @@ public class PhotosController : ControllerBase
             return Ok(new List<Photo>());
         }
 
-        for (int i = 0; i < Math.Min(pageSize, candidates.Count - skip); i++)
+        // 定义权重选择器
+        double WeightSelector(Photo p) => mode.ToLower() switch
         {
-            Photo photo;
+            "waiting" => 100 - p.Knownness + 1,
+            "consolidate" => Math.Max(1, 100 - p.Knownness) * Math.Max(1, Math.Pow(p.OverallScore, 2)),
+            "enjoy" => Math.Pow(p.OverallScore, 2) / (p.ViewCount + 1),
+            _ => 1.0
+        };
 
-            if (mode.ToLower() == "waiting")
-            {
-                // 待打分：已知性越低权重越高
-                photo = _scoringService.WeightedRandomSelect(candidates, p => 100 - p.Knownness + 1);
-            }
-            else if (mode.ToLower() == "consolidate")
-            {
-                // 巩固：已知性低 + 整体分高
-                photo = _scoringService.WeightedRandomSelect(candidates, p =>
-                {
-                    var knownnessPenalty = Math.Max(1, 100 - p.Knownness);
-                    var scoreBoost = Math.Max(1, Math.Pow(p.OverallScore, 2));
-                    return knownnessPenalty * scoreBoost;
-                });
-            }
-            else // enjoy
-            {
-                // 享受：按照片最终分数的平方关系来计算
-                photo = _scoringService.WeightedRandomSelect(candidates, p => Math.Pow(p.OverallScore, 2));
-            }
-
+        // 使用加权随机选择
+        var totalToSelect = page * pageSize;
+        var selectedPhotos = new List<Photo>();
+        var limit = Math.Min(totalToSelect, candidates.Count);
+        for (int i = 0; i < limit; i++)
+        {
+            var photo = _scoringService.WeightedRandomSelect(candidates, WeightSelector);
             selectedPhotos.Add(photo);
             candidates.Remove(photo);
-
-            if (candidates.Count == 0) break;
         }
 
-        return Ok(selectedPhotos);
+        // 只返回当前页的照片
+        var currentPagePhotos = selectedPhotos
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Ok(currentPagePhotos);
     }
 
     /// <summary>
