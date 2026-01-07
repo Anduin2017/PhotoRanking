@@ -102,6 +102,8 @@ public class AlbumsController : ControllerBase
             "independentscore" => query.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
             "overallscore" => query.OrderByDescending(p => p.OverallScore),
             "knownness" => query.OrderByDescending(p => p.Knownness),
+            "rated" => query.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
+            "unrated" => query.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
             _ => query.OrderBy(p => p.FilePath) // 默认按文件名
         };
 

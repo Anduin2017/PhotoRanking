@@ -32,9 +32,10 @@
             <span class="sort-label">排序:</span>
             <select [value]="sortBy" (change)="onSortChange($any($event.target).value)" class="sort-select">
                 <option value="filename">文件名</option>
-                <option value="score">最高分</option>
-                <option value="unrated">未打分优先</option>
+                <option value="overallscore">整体分排序</option>
+                <option value="independentscore">独立分排序</option>
                 <option value="rated">已打分优先</option>
+                <option value="unrated">未打分优先</option>
             </select>
         </div>
     </div>

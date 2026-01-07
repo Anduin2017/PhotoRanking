@@ -21,7 +21,7 @@
     </PackageReference>
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
-  <Target Name="NpmInstall" AfterTargets="Restore" Condition="'$(NG_SKIP_BUILD)' != 'True'">
+  <Target Name="NpmInstall" BeforeTargets="AngularBuild" Condition="'$(NG_SKIP_BUILD)' != 'True'">
     <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
     <Exec Command="npm install" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
   </Target>
