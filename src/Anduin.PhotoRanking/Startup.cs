@@ -1,8 +1,10 @@
 using Aiursoft.DbTools.Sqlite;
 using Aiursoft.WebTools.Abstractions.Models;
+using System.IO;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
 using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
@@ -42,10 +44,19 @@ public class Startup : IWebStartup
     public void Configure(WebApplication app)
     {
         app.UseStaticFiles();
+        var distPath = Path.Combine(app.Environment.WebRootPath, "dist");
+        if (Directory.Exists(distPath))
+        {
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(distPath),
+                RequestPath = ""
+            });
+        }
         app.UseRouting();
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapDefaultControllerRoute();
-        app.MapFallbackToFile("index.html");
+        app.MapFallbackToFile(Directory.Exists(distPath) ? "dist/index.html" : "index.html");
     }
 }
