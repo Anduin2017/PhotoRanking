@@ -1,6 +1,5 @@
 using Aiursoft.DbTools.Sqlite;
 using Aiursoft.WebTools.Abstractions.Models;
-using System.IO;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
 using Microsoft.AspNetCore.Mvc.Razor;
