@@ -129,13 +129,21 @@
 .album-thumbnail-card {
     position: relative;
     height: 280px;
-    background-size: cover;
-    background-position: center;
     overflow: hidden;
     border-radius: 16px;
     border: 1px solid var(--border);
     cursor: pointer;
     transition: all 0.3s ease;
+}
+
+.album-thumbnail-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
 }
 
 .album-thumbnail-card:hover {

@@ -7,8 +7,8 @@
             <h2 class="stat-section-title">相册分最高的相册</h2>
             <div class="stat-grid">
                 <div *ngFor="let album of stats.topAlbumsByScore" class="stat-card album-thumbnail-card"
-                     [style.backgroundImage]="album.thumbnailPath ? 'url(\'' + photoService.getImageUrl(album.thumbnailPath) + '\')' : ''"
                      (click)="openAlbum(album.albumId)">
+                    <img *ngIf="album.thumbnailPath" [src]="photoService.getImageUrl(album.thumbnailPath)" class="album-thumbnail-image" loading="lazy">
                     <div class="album-card-overlay"></div>
                     <div class="album-card-content">
                         <div class="stat-card-title">
@@ -38,8 +38,8 @@
             <h2 class="stat-section-title">已知率最高的相册</h2>
             <div class="stat-grid">
                 <div *ngFor="let album of stats.topAlbumsByKnownRate" class="stat-card album-thumbnail-card"
-                     [style.backgroundImage]="album.thumbnailPath ? 'url(\'' + photoService.getImageUrl(album.thumbnailPath) + '\')' : ''"
                      (click)="openAlbum(album.albumId)">
+                     <img *ngIf="album.thumbnailPath" [src]="photoService.getImageUrl(album.thumbnailPath)" class="album-thumbnail-image" loading="lazy">
                      <div class="album-card-overlay"></div>
                      <div class="album-card-content">
                         <div class="stat-card-title">
