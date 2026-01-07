@@ -36,6 +36,12 @@
     z-index: 20; /* Higher than swiper and info */
 }
 
+.viewer-close.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-20px);
+}
+
 .viewer-close svg {
     width: 24px;
     height: 24px;
@@ -49,6 +55,11 @@
 }
 
 .viewer-info {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    z-index: 10;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -58,6 +69,13 @@
     gap: 2rem;
     flex-wrap: wrap;
     color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.viewer-info.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
 }
 
 .viewer-album-info {

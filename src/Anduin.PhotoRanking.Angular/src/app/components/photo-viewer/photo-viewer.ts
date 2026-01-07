@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Photo, PhotoService } from '../../services/photo';
 import Swiper from 'swiper';
@@ -21,8 +21,12 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
+  showInfo = true;
 
-  constructor(public photoService: PhotoService, private router: Router) { }
+  constructor(
+    public photoService: PhotoService, 
+    private router: Router,
+    private cdr: ChangeDetectorRef) { }
 
   ngOnInit() {
     // Swiper init happens in ngAfterViewInit
@@ -65,6 +69,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
           if (this.photos[index]) {
             this.updateOverlay(this.photos[index].id);
           }
+        },
+        click: () => {
+          this.showInfo = !this.showInfo;
+          this.cdr.detectChanges();
         }
       }
     });
