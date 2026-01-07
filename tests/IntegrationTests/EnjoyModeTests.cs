@@ -40,7 +40,7 @@ public class EnjoyModeTests
     }
 
     [TestMethod]
-    public async Task TestEnjoyModeIncludesAllPhotos()
+    public async Task TestEnjoyModeFiltersLowScorePhotos()
     {
         // 1. Seed data
         using (var scope = _server!.Services.CreateScope())
@@ -50,30 +50,29 @@ public class EnjoyModeTests
             var album = new Album { AlbumId = "test-album", Name = "Test Album" };
             context.Albums.Add(album);
             
-            // Photo with high score and rated
+            // Photo with high score (>= 3.0)
             context.Photos.Add(new Photo 
             { 
                 FilePath = "photo1.jpg", 
                 AlbumId = "test-album", 
-                OverallScore = 5, 
+                OverallScore = 3.5, 
                 RatingCount = 1 
             });
             
-            // Photo with low score and NOT rated (was excluded before)
+            // Photo with low score (< 3.0)
             context.Photos.Add(new Photo 
             { 
                 FilePath = "photo2.jpg", 
                 AlbumId = "test-album", 
-                OverallScore = 1, 
-                RatingCount = 0 
+                OverallScore = 1.5, 
+                RatingCount = 1 
             });
             
             await context.SaveChangesAsync();
         }
 
-        // 2. Call API multiple times to verify unrated photo can be selected
-        bool gotPhoto2 = false;
-        for (int i = 0; i < 50; i++)
+        // 2. Call API multiple times to verify only high score photos are selected
+        for (int i = 0; i < 20; i++)
         {
             var response = await _http.GetAsync("/api/photos/discover?mode=enjoy&pageSize=10");
             response.EnsureSuccessStatusCode();
@@ -84,13 +83,8 @@ public class EnjoyModeTests
                 PropertyNameCaseInsensitive = true 
             });
 
-            if (photos!.Any(x => x.FilePath == "photo2.jpg"))
-            {
-                gotPhoto2 = true;
-                break;
-            }
+            Assert.IsFalse(photos!.Any(x => x.FilePath == "photo2.jpg"), "Low score photo should NOT be included in enjoy mode");
+            Assert.IsTrue(photos!.All(x => x.OverallScore >= 3.0), "All photos in enjoy mode should have overall score >= 3.0");
         }
-        
-        Assert.IsTrue(gotPhoto2, "Unrated photo should be included in enjoy mode");
     }
 }

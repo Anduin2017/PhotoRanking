@@ -120,8 +120,10 @@ public class PhotosController : ControllerBase
                 }
                 break;
 
-            case "enjoy": // 享受：所有照片参与轮转
-                candidates = allPhotos;
+            case "enjoy": // 享受：只有3.00分综合分以上的照片
+                candidates = allPhotos
+                    .Where(p => p.OverallScore >= 3.0)
+                    .ToList();
                 break;
 
             default:
