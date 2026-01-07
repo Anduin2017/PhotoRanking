@@ -18,6 +18,7 @@ export class DiscoverComponent implements OnInit {
   hasMore = true;
   pageSize = 30;
   mode = 'waiting';
+  loadingMode: string | null = null; // Track which mode is currently being loaded
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -39,6 +40,7 @@ export class DiscoverComponent implements OnInit {
     this.photos = [];
     this.page = 1;
     this.hasMore = true;
+    this.isLoading = false; // Reset loading state to allow immediate new request
     this.loadMore();
   }
 
@@ -46,8 +48,16 @@ export class DiscoverComponent implements OnInit {
     if (this.isLoading || !this.hasMore) return;
 
     this.isLoading = true;
-    this.photoService.getDiscoverPhotos(this.mode, this.page, this.pageSize).subscribe({
+    const requestMode = this.mode; // Capture the current mode for this request
+    this.loadingMode = requestMode;
+
+    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize).subscribe({
       next: (newPhotos) => {
+        // Ignore this response if the mode has changed since the request was made
+        if (this.loadingMode !== requestMode) {
+          return;
+        }
+
         if (newPhotos.length === 0) {
           if (this.page === 1) {
             // specific empty state handling if needed
@@ -63,6 +73,11 @@ export class DiscoverComponent implements OnInit {
         this.isLoading = false;
       },
       error: (err) => {
+        // Ignore errors from outdated requests
+        if (this.loadingMode !== requestMode) {
+          return;
+        }
+
         console.error('Error loading discover', err);
         this.isLoading = false;
       }

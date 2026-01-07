@@ -49,10 +49,11 @@ public class PhotosController : ControllerBase
 
         // 计算要选择的总数量
         int totalToSelect = page * pageSize;
+        var limit = Math.Min(totalToSelect, photos.Count);
 
         // 加权：整体分高、浏览次数低的照片权重更高
         var selectedPhotos = new List<Photo>();
-        for (int i = 0; i < Math.Min(totalToSelect, photos.Count); i++)
+        for (int i = 0; i < limit; i++)
         {
             var photo = _scoringService.WeightedRandomSelect(photos, p =>
             {
@@ -63,8 +64,6 @@ public class PhotosController : ControllerBase
 
             selectedPhotos.Add(photo);
             photos.Remove(photo); // 避免重复
-
-            if (photos.Count == 0) break;
         }
 
         // 只返回当前页的照片
@@ -121,84 +120,43 @@ public class PhotosController : ControllerBase
                 }
                 break;
 
-            case "enjoy": // 享受：整体分越高越好
-                // 只显示被评分过的照片（排除默认2.5分）
-                // 第1优先级：高分照片（>3.5且被评分过）
+            case "enjoy": // 享受：只有3.00分综合分以上的照片
                 candidates = allPhotos
-                    .Where(p => p.OverallScore > 3.5 && p.RatingCount > 0)
+                    .Where(p => p.OverallScore >= 3.0)
                     .ToList();
-
-                // 第2优先级：中高分照片（>3.0且被评分过）
-                if (candidates.Count < 100)
-                {
-                    candidates = allPhotos
-                        .Where(p => p.OverallScore > 3.0 && p.RatingCount > 0)
-                        .ToList();
-                }
-
-                // 第3优先级：所有被评分过的照片，按分数降序
-                if (candidates.Count < 50)
-                {
-                    candidates = allPhotos
-                        .Where(p => p.RatingCount > 0)
-                        .OrderByDescending(p => p.OverallScore)
-                        .ToList();
-                }
-
-                // 如果用户还没评分过任何照片，显示提示
-                if (candidates.Count == 0)
-                {
-                    // 返回空列表，前端会显示"暂无照片"
-                    return Ok(new List<Photo>());
-                }
                 break;
 
             default:
                 return BadRequest("Invalid mode");
         }
 
+        // 定义权重选择器
+        double WeightSelector(Photo p) => mode.ToLower() switch
+        {
+            "waiting" => 100 - p.Knownness + 1,
+            "consolidate" => Math.Max(1, 100 - p.Knownness) * Math.Max(1, Math.Pow(p.OverallScore, 2)),
+            "enjoy" => Math.Pow(p.OverallScore + 1, 2) / (p.ViewCount + 1),
+            _ => 1.0
+        };
+
         // 使用加权随机选择
+        var totalToSelect = page * pageSize;
         var selectedPhotos = new List<Photo>();
-        var skip = (page - 1) * pageSize;
-
-        // 如果候选照片不够，直接返回
-        if (skip >= candidates.Count)
+        var limit = Math.Min(totalToSelect, candidates.Count);
+        for (int i = 0; i < limit; i++)
         {
-            return Ok(new List<Photo>());
-        }
-
-        for (int i = 0; i < Math.Min(pageSize, candidates.Count - skip); i++)
-        {
-            Photo photo;
-
-            if (mode.ToLower() == "waiting")
-            {
-                // 待打分：已知性越低权重越高
-                photo = _scoringService.WeightedRandomSelect(candidates, p => 100 - p.Knownness + 1);
-            }
-            else if (mode.ToLower() == "consolidate")
-            {
-                // 巩固：已知性低 + 整体分高
-                photo = _scoringService.WeightedRandomSelect(candidates, p =>
-                {
-                    var knownnessPenalty = Math.Max(1, 100 - p.Knownness);
-                    var scoreBoost = Math.Max(1, Math.Pow(p.OverallScore, 2));
-                    return knownnessPenalty * scoreBoost;
-                });
-            }
-            else // enjoy
-            {
-                // 享受：整体分的3次方
-                photo = _scoringService.WeightedRandomSelect(candidates, p => Math.Pow(Math.Max(0.1, p.OverallScore), 3));
-            }
-
+            var photo = _scoringService.WeightedRandomSelect(candidates, WeightSelector);
             selectedPhotos.Add(photo);
             candidates.Remove(photo);
-
-            if (candidates.Count == 0) break;
         }
 
-        return Ok(selectedPhotos);
+        // 只返回当前页的照片
+        var currentPagePhotos = selectedPhotos
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Ok(currentPagePhotos);
     }
 
     /// <summary>

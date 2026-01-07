@@ -36,6 +36,6 @@
     <ItemGroup>
       <AngularBuildFiles Include="../Anduin.PhotoRanking.Angular/dist/Anduin.PhotoRanking.Angular/browser/**/*" />
     </ItemGroup>
-    <Copy SourceFiles="@(AngularBuildFiles)" DestinationFolder="wwwroot/%(RecursiveDir)" />
+    <Copy SourceFiles="@(AngularBuildFiles)" DestinationFolder="wwwroot/dist/%(RecursiveDir)" />
   </Target>
 </Project>
