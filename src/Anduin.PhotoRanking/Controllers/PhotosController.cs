@@ -49,10 +49,10 @@ public class PhotosController : ControllerBase
 
         // 计算要选择的总数量
         int totalToSelect = page * pageSize;
+        var limit = Math.Min(totalToSelect, photos.Count);
 
         // 加权：整体分高、浏览次数低的照片权重更高
         var selectedPhotos = new List<Photo>();
-        var limit = Math.Min(totalToSelect, photos.Count);
         for (int i = 0; i < limit; i++)
         {
             var photo = _scoringService.WeightedRandomSelect(photos, p =>
@@ -128,21 +128,12 @@ public class PhotosController : ControllerBase
                 return BadRequest("Invalid mode");
         }
 
-        // 使用加权随机选择
-        var skip = (page - 1) * pageSize;
-
-        // 如果候选照片不够，直接返回
-        if (skip >= candidates.Count)
-        {
-            return Ok(new List<Photo>());
-        }
-
         // 定义权重选择器
         double WeightSelector(Photo p) => mode.ToLower() switch
         {
             "waiting" => 100 - p.Knownness + 1,
             "consolidate" => Math.Max(1, 100 - p.Knownness) * Math.Max(1, Math.Pow(p.OverallScore, 2)),
-            "enjoy" => Math.Pow(p.OverallScore, 2) / (p.ViewCount + 1),
+            "enjoy" => Math.Pow(p.OverallScore + 1, 2) / (p.ViewCount + 1),
             _ => 1.0
         };
 
