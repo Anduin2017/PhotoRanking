@@ -17,7 +17,7 @@ export class BrowserComponent implements OnInit {
 
   // Computed view model
   breadcrumbParts: { name: string, path: string }[] = [];
-  folders: { name: string, fullPath: string }[] = [];
+  folders: { name: string, fullPath: string, isParent?: boolean }[] = [];
   albums: Album[] = [];
 
   constructor(public photoService: PhotoService, private router: Router) { }
@@ -79,10 +79,17 @@ export class BrowserComponent implements OnInit {
       }
     });
 
-    this.folders = Array.from(folderMap.entries())
+    const folders: { name: string, fullPath: string, isParent?: boolean }[] = Array.from(folderMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, fullPath]) => ({ name, fullPath }));
 
+    if (this.currentPath) {
+      const lastSlashIndex = this.currentPath.lastIndexOf('/');
+      const parentPath = lastSlashIndex === -1 ? '' : this.currentPath.substring(0, lastSlashIndex);
+      folders.unshift({ name: '.. (上级目录)', fullPath: parentPath, isParent: true });
+    }
+
+    this.folders = folders;
     this.albums = currentLevelAlbums.sort((a, b) => a.name.localeCompare(b.name));
   }
 

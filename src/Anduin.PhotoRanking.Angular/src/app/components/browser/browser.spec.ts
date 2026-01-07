@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Browser } from './browser';
+import { BrowserComponent } from './browser';
 
-describe('Browser', () => {
-  let component: Browser;
-  let fixture: ComponentFixture<Browser>;
+describe('BrowserComponent', () => {
+  let component: BrowserComponent;
+  let fixture: ComponentFixture<BrowserComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Browser]
+      imports: [BrowserComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(Browser);
+    fixture = TestBed.createComponent(BrowserComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });
