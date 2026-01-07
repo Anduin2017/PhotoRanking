@@ -21,15 +21,18 @@
     </PackageReference>
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
-  <Target Name="NpmInstall" AfterTargets="Restore">
+  <Target Name="NpmInstall" BeforeTargets="AngularBuild" Condition="'$(NG_SKIP_BUILD)' != 'True'">
     <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
     <Exec Command="npm install" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
   </Target>
 
-  <Target Name="AngularBuild" BeforeTargets="Build">
+  <Target Name="AngularBuild" BeforeTargets="Build" Condition="'$(NG_SKIP_BUILD)' != 'True'">
     <Message Importance="high" Text="Building Angular application..." />
-    <Exec Command="npm install" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
-    <Exec Command="npm run build" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
+    <Exec Command="npm run build" WorkingDirectory="../Anduin.PhotoRanking.Angular" EnvironmentVariables="NG_CLI_ANALYTICS=false" />
+    <ItemGroup>
+      <OldBuildFiles Include="wwwroot/main-*.js;wwwroot/polyfills-*.js;wwwroot/styles-*.css" />
+    </ItemGroup>
+    <Delete Files="@(OldBuildFiles)" />
     <ItemGroup>
       <AngularBuildFiles Include="../Anduin.PhotoRanking.Angular/dist/Anduin.PhotoRanking.Angular/browser/**/*" />
     </ItemGroup>

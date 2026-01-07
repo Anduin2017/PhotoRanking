@@ -69,9 +69,9 @@ export class PhotoService {
     return this.http.get<Album[]>(`${this.apiBase}/albums`);
   }
 
-  getAlbum(albumId: string): Observable<AlbumDetails> {
+  getAlbum(albumId: string, sortBy: string = 'filename'): Observable<AlbumDetails> {
     // Handling encoded albumId if necessary, angular HttpParams usually handles this but manual encoding might be needed for path params
-    return this.http.get<AlbumDetails>(`${this.apiBase}/albums/${encodeURIComponent(albumId)}`);
+    return this.http.get<AlbumDetails>(`${this.apiBase}/albums/${encodeURIComponent(albumId)}?sortBy=${sortBy}`);
   }
 
   getDiscoverPhotos(mode: string, page: number, pageSize: number): Observable<Photo[]> {

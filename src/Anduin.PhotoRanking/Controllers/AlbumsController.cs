@@ -46,7 +46,7 @@ public class AlbumsController : ControllerBase
     /// 获取相册详情
     /// </summary>
     [HttpGet("{*albumId}")]
-    public async Task<ActionResult<object>> GetAlbum(string albumId)
+    public async Task<ActionResult<object>> GetAlbum(string albumId, [FromQuery] string sortBy = "filename")
     {
         // URL解码albumId以支持包含斜杠的嵌套路径
         albumId = Uri.UnescapeDataString(albumId);
@@ -60,15 +60,21 @@ public class AlbumsController : ControllerBase
             return NotFound();
         }
 
-        // 按文件名排序
-        var photos = album.Photos
-            .OrderBy(p => p.FilePath)
-            .ToList();
+        // 根据sortBy参数排序
+        var photos = album.Photos.AsEnumerable();
+        photos = sortBy.ToLower() switch
+        {
+            "score" or "overallscore" => photos.OrderByDescending(p => p.OverallScore),
+            "rated" => photos.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
+            "unrated" => photos.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
+            "independentscore" => photos.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
+            _ => photos.OrderBy(p => p.FilePath)
+        };
 
         return Ok(new
         {
             Album = album,
-            Photos = photos
+            Photos = photos.ToList()
         });
     }
 
@@ -96,6 +102,8 @@ public class AlbumsController : ControllerBase
             "independentscore" => query.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
             "overallscore" => query.OrderByDescending(p => p.OverallScore),
             "knownness" => query.OrderByDescending(p => p.Knownness),
+            "rated" => query.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
+            "unrated" => query.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
             _ => query.OrderBy(p => p.FilePath) // 默认按文件名
         };
 

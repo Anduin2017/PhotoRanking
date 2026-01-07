@@ -16,6 +16,7 @@ export class AlbumComponent implements OnInit {
   album: Album | null = null;
   photos: Photo[] = [];
   isLoading = true;
+  sortBy: string = 'filename';
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -33,7 +34,7 @@ export class AlbumComponent implements OnInit {
 
   loadAlbum(id: string) {
     this.isLoading = true;
-    this.photoService.getAlbum(id).subscribe({
+    this.photoService.getAlbum(id, this.sortBy).subscribe({
       next: (details) => {
         this.album = details.album;
         this.photos = details.photos;
@@ -44,6 +45,11 @@ export class AlbumComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+
+  onSortChange(newSort: string) {
+    this.sortBy = newSort;
+    this.loadAlbum(this.albumId);
   }
 
   openViewer(photoId: number) {

@@ -50,6 +50,44 @@
     color: var(--text-primary);
 }
 
+.album-actions {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.sort-control {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--surface-light);
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.sort-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.sort-select {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    padding-right: 0.5rem;
+}
+
+.sort-select option {
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
 /* Reusing grid styles from discover.css globally or importing them?
    Angular default view encapsulation isolates styles.
    We should probably move common grid styles to styles.css or copy them here.
