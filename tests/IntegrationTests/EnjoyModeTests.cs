@@ -87,4 +87,61 @@ public class EnjoyModeTests
             Assert.IsTrue(photos!.All(x => x.OverallScore >= 3.0), "All photos in enjoy mode should have overall score >= 3.0");
         }
     }
+
+    [TestMethod]
+    public async Task TestEnjoyModeWithCustomMinScore()
+    {
+        // 1. Seed data
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var album = new Album { AlbumId = "test-album-2", Name = "Test Album 2" };
+            context.Albums.Add(album);
+
+            // Photo with score 4.5
+            context.Photos.Add(new Photo
+            {
+                FilePath = "photo-high.jpg",
+                AlbumId = "test-album-2",
+                OverallScore = 4.5,
+                RatingCount = 1
+            });
+
+            // Photo with score 3.5
+            context.Photos.Add(new Photo
+            {
+                FilePath = "photo-mid.jpg",
+                AlbumId = "test-album-2",
+                OverallScore = 3.5,
+                RatingCount = 1
+            });
+
+            // Photo with score 2.5
+            context.Photos.Add(new Photo
+            {
+                FilePath = "photo-low.jpg",
+                AlbumId = "test-album-2",
+                OverallScore = 2.5,
+                RatingCount = 1
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        // 2. Call API with minScore = 4.0
+        var response = await _http.GetAsync("/api/photos/discover?mode=enjoy&minScore=4.0&pageSize=10");
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync();
+        var photos = JsonSerializer.Deserialize<List<Photo>>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        Assert.IsTrue(photos!.All(x => x.OverallScore >= 4.0), "All photos should have overall score >= 4.0");
+        Assert.IsTrue(photos!.Any(x => x.FilePath == "photo-high.jpg"));
+        Assert.IsFalse(photos!.Any(x => x.FilePath == "photo-mid.jpg"));
+        Assert.IsFalse(photos!.Any(x => x.FilePath == "photo-low.jpg"));
+    }
 }

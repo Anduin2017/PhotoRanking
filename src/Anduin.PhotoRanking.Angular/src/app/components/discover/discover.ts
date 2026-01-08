@@ -18,7 +18,9 @@ export class DiscoverComponent implements OnInit {
   hasMore = true;
   pageSize = 30;
   mode = 'waiting';
+  minScore = 3.0;
   loadingMode: string | null = null; // Track which mode is currently being loaded
+  loadingMinScore: number | null = null; // Track which minScore is currently being loaded
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -37,6 +39,15 @@ export class DiscoverComponent implements OnInit {
   setMode(mode: string) {
     if (this.mode === mode) return;
     this.mode = mode;
+    this.resetAndLoad();
+  }
+
+  setMinScore(score: number) {
+    this.minScore = score;
+    this.resetAndLoad();
+  }
+
+  private resetAndLoad() {
     this.photos = [];
     this.page = 1;
     this.hasMore = true;
@@ -49,12 +60,14 @@ export class DiscoverComponent implements OnInit {
 
     this.isLoading = true;
     const requestMode = this.mode; // Capture the current mode for this request
+    const requestMinScore = this.minScore; // Capture the current minScore for this request
     this.loadingMode = requestMode;
+    this.loadingMinScore = requestMinScore;
 
-    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize).subscribe({
+    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize, requestMinScore).subscribe({
       next: (newPhotos) => {
-        // Ignore this response if the mode has changed since the request was made
-        if (this.loadingMode !== requestMode) {
+        // Ignore this response if the mode or minScore has changed since the request was made
+        if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore) {
           return;
         }
 
@@ -74,7 +87,7 @@ export class DiscoverComponent implements OnInit {
       },
       error: (err) => {
         // Ignore errors from outdated requests
-        if (this.loadingMode !== requestMode) {
+        if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore) {
           return;
         }
 

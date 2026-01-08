@@ -82,7 +82,8 @@ public class PhotosController : ControllerBase
     public async Task<ActionResult<List<Photo>>> GetDiscover(
         [FromQuery] string mode = "waiting",
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 30)
+        [FromQuery] int pageSize = 30,
+        [FromQuery] double minScore = 3.0)
     {
         var allPhotos = await _context.Photos
             .Include(p => p.Album)
@@ -120,9 +121,9 @@ public class PhotosController : ControllerBase
                 }
                 break;
 
-            case "enjoy": // 享受：只有3.00分综合分以上的照片
+            case "enjoy": // 享受：只有设置的分数综合分以上的照片
                 candidates = allPhotos
-                    .Where(p => p.OverallScore >= 3.0)
+                    .Where(p => p.OverallScore >= minScore)
                     .ToList();
                 break;
 

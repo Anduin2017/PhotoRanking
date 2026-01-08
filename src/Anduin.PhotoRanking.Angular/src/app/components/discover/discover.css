@@ -57,6 +57,29 @@
     color: var(--text-secondary);
 }
 
+.discover-filter-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.discover-filter-container label {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 100px;
+}
+
+.discover-filter-container input[type="range"] {
+    flex: 1;
+    max-width: 300px;
+}
+
 /* 照片网格（3列瀑布流） */
 .discover-photos-grid {
     display: grid;
