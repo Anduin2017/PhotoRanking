@@ -1,10 +1,6 @@
 using Anduin.PhotoRanking.Data;
-using Anduin.PhotoRanking.Models;
 using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
 namespace Anduin.PhotoRanking.Tests;
