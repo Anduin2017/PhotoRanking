@@ -8,14 +8,14 @@
         </div>
     </div>
 
-    <button class="viewer-close" (click)="onClose()">
+    <button class="viewer-close" (click)="onClose()" [class.hidden]="!showInfo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
     </button>
 
-    <div class="viewer-info" style="position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 10;" *ngIf="currentPhoto" (click)="$event.stopPropagation()">
+    <div class="viewer-info" [class.hidden]="!showInfo" *ngIf="currentPhoto" (click)="$event.stopPropagation()">
         <div class="viewer-album-info" (click)="openAlbum()" style="cursor: pointer;">
             <div class="album-info-left">
                 <div class="album-name" *ngIf="currentPhoto.album">
