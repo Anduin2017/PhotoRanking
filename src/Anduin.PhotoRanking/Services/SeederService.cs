@@ -34,6 +34,8 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
 
         var albumsToAdd = new List<Album>();
         var photosToAdd = new List<Photo>();
+        var foundPhotoPaths = new HashSet<string>();
+        var foundAlbumIds = new HashSet<string>();
         var photosSkipped = 0;
 
         // 递归扫描所有目录
@@ -45,7 +47,9 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
             existingPhotoPaths,
             albumsToAdd,
             photosToAdd,
-            ref photosSkipped);
+            ref photosSkipped,
+            foundPhotoPaths,
+            foundAlbumIds);
 
         // 批量插入（比逐个插入快得多）
         if (albumsToAdd.Count > 0)
@@ -71,8 +75,33 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
             }
         }
 
-        logger.LogInformation("Seeding completed. Added: {Albums} albums, {Photos} photos. Skipped: {Skipped} photos",
-            albumsToAdd.Count, photosToAdd.Count, photosSkipped);
+        // 清理数据库中已不存在的文件
+        var allPhotos = await context.Photos.ToListAsync();
+        var photosToRemove = allPhotos
+            .Where(p => !foundPhotoPaths.Contains(p.FilePath))
+            .ToList();
+
+        if (photosToRemove.Count > 0)
+        {
+            logger.LogInformation("Removing {Count} photos that no longer exist on disk...", photosToRemove.Count);
+            context.Photos.RemoveRange(photosToRemove);
+            await context.SaveChangesAsync();
+        }
+
+        var allAlbums = await context.Albums.ToListAsync();
+        var albumsToRemove = allAlbums
+            .Where(a => !foundAlbumIds.Contains(a.AlbumId))
+            .ToList();
+
+        if (albumsToRemove.Count > 0)
+        {
+            logger.LogInformation("Removing {Count} albums that no longer exist on disk or have no photos...", albumsToRemove.Count);
+            context.Albums.RemoveRange(albumsToRemove);
+            await context.SaveChangesAsync();
+        }
+
+        logger.LogInformation("Seeding completed. Added: {Albums} albums, {Photos} photos. Removed: {RemovedPhotos} photos, {RemovedAlbums} albums. Skipped: {Skipped} photos",
+            albumsToAdd.Count, photosToAdd.Count, photosToRemove.Count, albumsToRemove.Count, photosSkipped);
 
         // Update metadata for existing photos if missing
         var photosMissingMetadata = await context.Photos
@@ -97,7 +126,7 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
         }
 
         // 更新相册统计
-        if (albumsToAdd.Count > 0 || photosToAdd.Count > 0)
+        if (albumsToAdd.Count > 0 || photosToAdd.Count > 0 || photosToRemove.Count > 0 || albumsToRemove.Count > 0)
         {
             await UpdateAlbumStatsAsync();
         }
@@ -114,7 +143,9 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
         HashSet<string> existingPhotoPaths,
         List<Album> albumsToAdd,
         List<Photo> photosToAdd,
-        ref int photosSkipped)
+        ref int photosSkipped,
+        HashSet<string> foundPhotoPaths,
+        HashSet<string> foundAlbumIds)
     {
         // 获取当前目录下的所有照片（不递归）
         var photoFiles = Directory.GetFiles(currentDir)
@@ -126,6 +157,9 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
         {
             var albumId = Path.GetRelativePath(rootPath, currentDir).Replace(Path.DirectorySeparatorChar, '/');
             var albumName = Path.GetFileName(currentDir);
+            
+            // 标记相册已找到
+            foundAlbumIds.Add(albumId);
 
             // 如果相册不存在，创建它
             if (!existingAlbumIds.Contains(albumId))
@@ -151,6 +185,9 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
             {
                 // 照片的相对路径是相对于根目录的
                 var relativePath = Path.GetRelativePath(rootPath, photoFile).Replace(Path.DirectorySeparatorChar, '/');
+                
+                // 标记照片已找到
+                foundPhotoPaths.Add(relativePath);
 
                 // 使用HashSet快速检查，无需查询数据库
                 if (!existingPhotoPaths.Contains(relativePath))
@@ -193,7 +230,9 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
                 existingPhotoPaths,
                 albumsToAdd,
                 photosToAdd,
-                ref photosSkipped);
+                ref photosSkipped,
+                foundPhotoPaths,
+                foundAlbumIds);
         }
     }
 
