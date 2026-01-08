@@ -17,6 +17,18 @@
         </button>
     </div>
 
+    <div *ngIf="mode === 'enjoy'" class="discover-filter-container">
+        <label for="minScoreRange">最低分: {{ minScore | number:'1.1-1' }}</label>
+        <input type="range" 
+               id="minScoreRange" 
+               min="0" 
+               max="5" 
+               step="0.1" 
+               [value]="minScore" 
+               (input)="minScore = +$any($event.target).value"
+               (change)="setMinScore(minScore)">
+    </div>
+
     <div class="discover-photos-grid">
         <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
             <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
