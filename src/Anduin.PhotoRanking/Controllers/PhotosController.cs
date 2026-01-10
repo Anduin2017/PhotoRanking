@@ -85,57 +85,65 @@ public class PhotosController : ControllerBase
         [FromQuery] int pageSize = 30,
         [FromQuery] double minScore = 3.0)
     {
-        var allPhotos = await _context.Photos
-            .Include(p => p.Album)
-            .ToListAsync();
-
-        if (allPhotos.Count == 0)
-        {
-            return Ok(new List<Photo>());
-        }
-
         List<Photo> candidates;
 
         // 根据模式选择候选照片
         switch (mode.ToLower())
         {
             case "waiting": // 待打分：已知性最低
-                candidates = allPhotos
+                candidates = await _context.Photos
+                    .Include(p => p.Album)
                     .OrderBy(p => p.Knownness)
-                    .ThenBy(_ => Guid.NewGuid())
-                    .Take(Math.Min(500, allPhotos.Count))
-                    .ToList();
+                    .Take(500)
+                    .ToListAsync();
                 break;
 
-            case "consolidate": // 巩固：已知性中等或整体分较高
-                candidates = allPhotos
-                    .Where(p =>
-                        (p.Knownness > 10 && p.Knownness < 90) ||
-                        (p.OverallScore > 2.8)
-                    )
-                    .ToList();
+            case "consolidate": // 巩固：尽可能将已知率较高的相册里还未评分的照片进行评分
+                var topAlbums = await _context.Albums
+                    .Where(a => a.KnownRate < 1)
+                    .OrderByDescending(a => a.KnownRate)
+                    .Take(35)
+                    .ToListAsync();
+
+                var albumIds = topAlbums.Select(a => a.AlbumId).ToList();
+
+                candidates = await _context.Photos
+                    .Include(p => p.Album)
+                    .Where(p => albumIds.Contains(p.AlbumId) && p.IndependentScore == null)
+                    .ToListAsync();
 
                 if (candidates.Count == 0)
                 {
-                    candidates = allPhotos;
+                    candidates = await _context.Photos
+                        .Include(p => p.Album)
+                        .Where(p => p.IndependentScore == null)
+                        .OrderByDescending(p => p.Album!.KnownRate)
+                        .Take(500)
+                        .ToListAsync();
                 }
                 break;
 
             case "enjoy": // 享受：只有设置的分数综合分以上的照片
-                candidates = allPhotos
+                candidates = await _context.Photos
+                    .Include(p => p.Album)
                     .Where(p => p.OverallScore >= minScore)
-                    .ToList();
+                    .ToListAsync();
                 break;
 
             default:
                 return BadRequest("Invalid mode");
         }
 
+        if (candidates.Count == 0)
+        {
+            return Ok(new List<Photo>());
+        }
+
         // 定义权重选择器
         double WeightSelector(Photo p) => mode.ToLower() switch
         {
             "waiting" => 100 - p.Knownness + 1,
-            "consolidate" => Math.Max(1, 100 - p.Knownness) * Math.Max(1, Math.Pow(p.OverallScore, 2)),
+            "consolidate" => (p.Album?.KnownRate ?? 0) * 100 + 1,
             "enjoy" => Math.Pow(p.OverallScore + 1, 2) / (p.ViewCount + 1),
             _ => 1.0
         };
