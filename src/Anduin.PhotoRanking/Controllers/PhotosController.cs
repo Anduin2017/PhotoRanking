@@ -117,7 +117,7 @@ public class PhotosController : ControllerBase
                     candidates = await _context.Photos
                         .Include(p => p.Album)
                         .Where(p => p.IndependentScore == null)
-                        .OrderByDescending(p => p.Album!.KnownRate)
+                        .OrderByDescending(p => p.Album.KnownRate)
                         .Take(500)
                         .ToListAsync();
                 }
@@ -143,7 +143,7 @@ public class PhotosController : ControllerBase
         double WeightSelector(Photo p) => mode.ToLower() switch
         {
             "waiting" => 100 - p.Knownness + 1,
-            "consolidate" => (p.Album?.KnownRate ?? 0) * 100 + 1,
+            "consolidate" => p.Album.KnownRate * 100 + 1,
             "enjoy" => Math.Pow(p.OverallScore + 1, 2) / (p.ViewCount + 1),
             _ => 1.0
         };

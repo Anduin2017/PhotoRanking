@@ -3,9 +3,6 @@ using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static Aiursoft.WebTools.Extends;
 
 namespace Anduin.PhotoRanking.Tests.IntegrationTests;
@@ -98,6 +95,6 @@ public class ConsolidateModeTests
         }
 
         Console.WriteLine($"Photo A (90% album): {countA}, Photo B (10% album): {countB}");
-        Assert.IsTrue(countA > countB, "Photo from higher known rate album should appear more frequently");
+        Assert.IsGreaterThan(countB, countA, "Photo from higher known rate album should appear more frequently");
     }
 }
