@@ -83,17 +83,17 @@ public class PhotosController : ControllerBase
         [FromQuery] string mode = "waiting",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
-        [FromQuery] double minScore = 3.0)
+        [FromQuery] double? minScore = null)
     {
         List<Photo> candidates;
 
         // 根据模式选择候选照片
         switch (mode.ToLower())
         {
-            case "waiting": // 待打分：已知性最低
+            case "waiting": // 待打分：纯随机
                 candidates = await _context.Photos
                     .Include(p => p.Album)
-                    .OrderBy(p => p.Knownness)
+                    .OrderBy(p => EF.Functions.Random())
                     .Take(500)
                     .ToListAsync();
                 break;
@@ -124,9 +124,10 @@ public class PhotosController : ControllerBase
                 break;
 
             case "enjoy": // 享受：只有设置的分数综合分以上的照片
+                var actualMinScore = minScore ?? 3.0;
                 candidates = await _context.Photos
                     .Include(p => p.Album)
-                    .Where(p => p.OverallScore >= minScore)
+                    .Where(p => p.OverallScore >= actualMinScore)
                     .ToListAsync();
                 break;
 

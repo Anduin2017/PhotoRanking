@@ -74,8 +74,12 @@ export class PhotoService {
     return this.http.get<AlbumDetails>(`${this.apiBase}/albums/${encodeURIComponent(albumId)}?sortBy=${sortBy}`);
   }
 
-  getDiscoverPhotos(mode: string, page: number, pageSize: number, minScore: number = 3.0): Observable<Photo[]> {
-    return this.http.get<Photo[]>(`${this.apiBase}/photos/discover?mode=${mode}&page=${page}&pageSize=${pageSize}&minScore=${minScore}`);
+  getDiscoverPhotos(mode: string, page: number, pageSize: number, minScore?: number): Observable<Photo[]> {
+    let url = `${this.apiBase}/photos/discover?mode=${mode}&page=${page}&pageSize=${pageSize}`;
+    if (minScore !== undefined && minScore !== null) {
+      url += `&minScore=${minScore}`;
+    }
+    return this.http.get<Photo[]>(url);
   }
 
   getTopStats(): Observable<any> {
