@@ -2,7 +2,7 @@ import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, 
 import { CommonModule } from '@angular/common';
 import { Photo, PhotoService } from '../../services/photo';
 import Swiper from 'swiper';
-import { Navigation, Virtual } from 'swiper/modules';
+import { Navigation, Virtual, Zoom } from 'swiper/modules';
 import { Router } from '@angular/router';
 
 @Component({
@@ -50,14 +50,20 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.swiper = new Swiper(this.swiperContainer.nativeElement, {
-      modules: [Virtual],
+      modules: [Virtual, Zoom],
+      zoom: {
+        maxRatio: 5,
+        minRatio: 1,
+      },
       virtual: {
         slides: this.photos,
         renderSlide: (slide: any) => {
           const photo = slide as Photo;
           const imgUrl = this.photoService.getImageUrl(photo.filePath);
           return `<div class="swiper-slide" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
-                        <img src="${imgUrl}" class="swiper-zoom-target" style="max-width:100%; max-height:100%; object-fit:contain;" />
+                        <div class="swiper-zoom-container">
+                            <img src="${imgUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+                        </div>
                     </div>`;
         }
       },
@@ -136,6 +142,18 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.currentPhoto) {
       this.onClose();
       this.router.navigate(['/album', this.currentPhoto.albumId]);
+    }
+  }
+
+  @HostListener('window:wheel', ['$event'])
+  onWheel(event: WheelEvent) {
+    if (this.swiper && this.swiper.zoom) {
+      event.preventDefault();
+      if (event.deltaY < 0) {
+        this.swiper.zoom.in();
+      } else {
+        this.swiper.zoom.out();
+      }
     }
   }
 
