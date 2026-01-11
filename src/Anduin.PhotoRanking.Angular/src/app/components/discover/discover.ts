@@ -64,7 +64,8 @@ export class DiscoverComponent implements OnInit {
     this.loadingMode = requestMode;
     this.loadingMinScore = requestMinScore;
 
-    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize, requestMinScore).subscribe({
+    const minScoreToSend = requestMode === 'enjoy' ? requestMinScore : undefined;
+    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize, minScoreToSend).subscribe({
       next: (newPhotos) => {
         // Ignore this response if the mode or minScore has changed since the request was made
         if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore) {
