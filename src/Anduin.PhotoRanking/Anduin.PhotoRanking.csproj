@@ -11,7 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aiursoft.DbTools.Sqlite" Version="10.0.8" />
-    <PackageReference Include="Aiursoft.WebTools" Version="10.0.4" />
+    <PackageReference Include="Aiursoft.WebTools" Version="10.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.1" />
@@ -25,17 +25,16 @@
     <Message Importance="high" Text="Restoring dependencies using 'npm'. This may take several minutes..." />
     <Exec Command="npm install" WorkingDirectory="../Anduin.PhotoRanking.Angular" />
   </Target>
-
   <Target Name="AngularBuild" BeforeTargets="Build" Condition="'$(NG_SKIP_BUILD)' != 'True'">
     <Message Importance="high" Text="Building Angular application..." />
     <Exec Command="npm run build" WorkingDirectory="../Anduin.PhotoRanking.Angular" EnvironmentVariables="NG_CLI_ANALYTICS=false" />
     <ItemGroup>
-      <OldBuildFiles Include="wwwroot/main-*.js;wwwroot/polyfills-*.js;wwwroot/styles-*.css" />
+      <OldBuildFiles Include="wwwroot/main-*.js;wwwroot/polyfills-*.js;wwwroot/styles-*.css"></OldBuildFiles>
     </ItemGroup>
-    <Delete Files="@(OldBuildFiles)" />
+    <Delete Files="@(OldBuildFiles)"></Delete>
     <ItemGroup>
-      <AngularBuildFiles Include="../Anduin.PhotoRanking.Angular/dist/Anduin.PhotoRanking.Angular/browser/**/*" />
+      <AngularBuildFiles Include="../Anduin.PhotoRanking.Angular/dist/Anduin.PhotoRanking.Angular/browser/**/*"></AngularBuildFiles>
     </ItemGroup>
-    <Copy SourceFiles="@(AngularBuildFiles)" DestinationFolder="wwwroot/dist/%(RecursiveDir)" />
+    <Copy SourceFiles="@(AngularBuildFiles)" DestinationFolder="wwwroot/dist/%(RecursiveDir)"></Copy>
   </Target>
 </Project>
