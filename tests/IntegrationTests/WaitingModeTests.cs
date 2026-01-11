@@ -112,7 +112,7 @@ public class WaitingModeTests
         var photos2 = JsonSerializer.Deserialize<List<Photo>>(content2, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         // Extremely unlikely to pick exactly same 5 photos in same order out of 50 if random
-        Assert.IsTrue(photos1!.Count > 0);
-        Assert.IsTrue(photos2!.Count > 0);
+        Assert.IsNotEmpty(photos1!);
+        Assert.IsNotEmpty(photos2!);
     }
 }
