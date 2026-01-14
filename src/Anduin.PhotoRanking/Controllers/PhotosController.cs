@@ -135,7 +135,7 @@ public class PhotosController : ControllerBase
                 var targetScore = minScore ?? 5.0;
                 candidates = await _context.Photos
                     .Include(p => p.Album)
-                    .Where(p => p.IndependentScore == targetScore)
+                    .Where(p => p.IndependentScore >= targetScore - 0.0001 && p.IndependentScore <= targetScore + 0.0001)
                     .ToListAsync();
                 break;
 

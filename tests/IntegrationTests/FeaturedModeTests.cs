@@ -3,8 +3,6 @@ using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using static Aiursoft.WebTools.Extends;
 
 namespace Anduin.PhotoRanking.Tests.IntegrationTests;
@@ -73,8 +71,8 @@ public class FeaturedModeTests
         });
 
         Assert.IsNotNull(photos);
-        Assert.AreEqual(2, photos.Count);
-        Assert.IsTrue(photos.All(x => x.IndependentScore == 5.0));
+        Assert.HasCount(2, photos);
+        Assert.IsTrue(photos.All(x => Math.Abs(x.IndependentScore!.Value - 5.0) < 0.0001));
         Assert.IsTrue(photos.Any(x => x.FilePath == "photo1.jpg"));
         Assert.IsTrue(photos.Any(x => x.FilePath == "photo3.jpg"));
 
@@ -89,8 +87,8 @@ public class FeaturedModeTests
         });
 
         Assert.IsNotNull(photos);
-        Assert.AreEqual(1, photos.Count);
-        Assert.AreEqual(4.0, photos[0].IndependentScore);
+        Assert.HasCount(1, photos);
+        Assert.AreEqual(4.0, photos[0].IndependentScore ?? 0, 0.0001);
         Assert.AreEqual("photo2.jpg", photos[0].FilePath);
     }
 
@@ -118,6 +116,6 @@ public class FeaturedModeTests
         });
 
         Assert.IsNotNull(photos);
-        Assert.AreEqual(0, photos.Count);
+        Assert.IsEmpty(photos);
     }
 }
