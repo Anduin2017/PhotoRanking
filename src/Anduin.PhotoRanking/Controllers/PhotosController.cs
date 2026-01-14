@@ -131,6 +131,14 @@ public class PhotosController : ControllerBase
                     .ToListAsync();
                 break;
 
+            case "featured": // 特选：按独立分随机刷
+                var targetScore = minScore ?? 5.0;
+                candidates = await _context.Photos
+                    .Include(p => p.Album)
+                    .Where(p => p.IndependentScore >= targetScore - 0.0001 && p.IndependentScore <= targetScore + 0.0001)
+                    .ToListAsync();
+                break;
+
             default:
                 return BadRequest("Invalid mode");
         }
@@ -146,6 +154,7 @@ public class PhotosController : ControllerBase
             "waiting" => 100 - p.Knownness + 1,
             "consolidate" => p.Album.KnownRate * 100 + 1,
             "enjoy" => Math.Pow(p.OverallScore + 1, 2) / (p.ViewCount + 1),
+            "featured" => 1.0 / (p.ViewCount + 1), // 特选模式下：浏览次数越少权重越高
             _ => 1.0
         };
 

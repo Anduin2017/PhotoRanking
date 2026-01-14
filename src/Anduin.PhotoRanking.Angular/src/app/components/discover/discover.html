@@ -15,6 +15,11 @@
             <div class="mode-label">享受</div>
             <div class="mode-desc">欣赏高分精选佳作</div>
         </button>
+        <button class="mode-btn" [class.active]="mode === 'featured'" (click)="setMode('featured')">
+            <div class="mode-icon">💎</div>
+            <div class="mode-label">特选</div>
+            <div class="mode-desc">按独立分随机刷</div>
+        </button>
     </div>
 
     <div *ngIf="mode === 'enjoy'" class="discover-filter-container">
@@ -27,6 +32,18 @@
                [value]="minScore" 
                (input)="minScore = +$any($event.target).value"
                (change)="setMinScore(minScore)">
+    </div>
+
+    <div *ngIf="mode === 'featured'" class="discover-filter-container">
+        <label>选择独立分:</label>
+        <div class="score-selector">
+            <button *ngFor="let s of [0, 1, 2, 3, 4, 5]" 
+                    class="score-btn" 
+                    [class.active]="minScore === s"
+                    (click)="setMinScore(s)">
+                {{ s }}
+            </button>
+        </div>
     </div>
 
     <div class="discover-photos-grid">
