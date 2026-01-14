@@ -49,6 +49,10 @@
                                 <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
                             </div>
                             <div class="stat-item">
+                                <span class="stat-label">已知率</span>
+                                <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
+                            </div>
+                            <div class="stat-item">
                                 <span class="stat-label">照片</span>
                                 <span class="stat-value">{{ album.photoCount }}</span>
                             </div>

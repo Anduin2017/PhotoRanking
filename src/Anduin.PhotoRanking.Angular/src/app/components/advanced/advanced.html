@@ -21,6 +21,10 @@
                                 <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
                             </div>
                             <div class="stat-item">
+                                <span class="stat-label">已知率</span>
+                                <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
+                            </div>
+                            <div class="stat-item">
                                 <span class="stat-label">照片</span>
                                 <span class="stat-value">{{ album.photoCount }}</span>
                             </div>
@@ -47,6 +51,10 @@
                             <div style="font-size: 0.7em; opacity: 0.6; font-weight: normal; margin-top: 2px; word-break: break-all;">{{ album.albumId }}</div>
                         </div>
                         <div class="album-card-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">相册分</span>
+                                <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
+                            </div>
                             <div class="stat-item">
                                 <span class="stat-label">已知率</span>
                                 <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
