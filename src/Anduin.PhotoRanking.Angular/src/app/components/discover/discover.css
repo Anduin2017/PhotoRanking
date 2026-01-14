@@ -80,6 +80,34 @@
     max-width: 300px;
 }
 
+.score-selector {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.score-btn {
+    padding: 0.5rem 1.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.score-btn:hover {
+    border-color: var(--primary);
+}
+
+.score-btn.active {
+    background: var(--gradient-primary);
+    color: white;
+    border-color: var(--primary);
+}
+
 /* 照片网格（3列瀑布流） */
 .discover-photos-grid {
     display: grid;
