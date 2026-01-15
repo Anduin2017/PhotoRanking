@@ -93,6 +93,7 @@ public class PhotosController : ControllerBase
             case "waiting": // 待打分：纯随机
                 candidates = await _context.Photos
                     .Include(p => p.Album)
+                    .Where(p => p.IndependentScore == null)
                     .OrderBy(p => EF.Functions.Random())
                     .Take(500)
                     .ToListAsync();

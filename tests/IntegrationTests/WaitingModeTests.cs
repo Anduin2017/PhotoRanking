@@ -115,4 +115,55 @@ public class WaitingModeTests
         Assert.IsNotEmpty(photos1!);
         Assert.IsNotEmpty(photos2!);
     }
+
+    [TestMethod]
+    public async Task TestWaitingModeExcludesRatedPhotos()
+    {
+        // 1. Seed data
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var album = new Album { AlbumId = "test-album-exclude", Name = "Test Album Exclude" };
+            context.Albums.Add(album);
+
+            // Rated photo
+            context.Photos.Add(new Photo
+            {
+                FilePath = "photo-rated.jpg",
+                AlbumId = "test-album-exclude",
+                IndependentScore = 3.0,
+                OverallScore = 3.0,
+                Knownness = 50,
+                RatingCount = 1
+            });
+
+            // Unrated photo
+            context.Photos.Add(new Photo
+            {
+                FilePath = "photo-unrated.jpg",
+                AlbumId = "test-album-exclude",
+                IndependentScore = null,
+                OverallScore = 0,
+                Knownness = 0,
+                RatingCount = 0
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        // 2. Call API in waiting mode
+        var response = await _http.GetAsync("/api/photos/discover?mode=waiting&pageSize=10");
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync();
+        var photos = JsonSerializer.Deserialize<List<Photo>>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        Assert.IsNotNull(photos);
+        Assert.IsFalse(photos.Any(x => x.FilePath == "photo-rated.jpg"), "Rated photo SHOULD NOT be included in waiting mode");
+        Assert.IsTrue(photos.Any(x => x.FilePath == "photo-unrated.jpg"), "Unrated photo SHOULD be included in waiting mode");
+    }
 }
