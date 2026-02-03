@@ -1,20 +1,37 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { PhotoViewerComponent } from './photo-viewer';
+import { PhotoService } from '../../services/photo';
+import { Router } from '@angular/router';
+import { of } from 'rxjs';
 
-import { PhotoViewer } from './photo-viewer';
+describe('PhotoViewerComponent', () => {
+  let component: PhotoViewerComponent;
+  let fixture: ComponentFixture<PhotoViewerComponent>;
 
-describe('PhotoViewer', () => {
-  let component: PhotoViewer;
-  let fixture: ComponentFixture<PhotoViewer>;
+  const photoServiceMock = {
+    getImageUrl: (path: string) => path,
+    getPhoto: (id: number) => of({}),
+    viewPhoto: (id: number) => of({}),
+    ratePhoto: (id: number, score: number) => of({})
+  };
+
+  const routerMock = {
+    navigate: () => {}
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PhotoViewer]
+      imports: [PhotoViewerComponent],
+      providers: [
+        { provide: PhotoService, useValue: photoServiceMock },
+        { provide: Router, useValue: routerMock }
+      ]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(PhotoViewer);
+    fixture = TestBed.createComponent(PhotoViewerComponent);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    fixture.detectChanges();
   });
 
   it('should create', () => {

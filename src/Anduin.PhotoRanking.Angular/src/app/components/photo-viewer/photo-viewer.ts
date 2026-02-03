@@ -1,5 +1,6 @@
 import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Photo, PhotoService } from '../../services/photo';
 import Swiper from 'swiper';
 import { Navigation, Virtual, Zoom } from 'swiper/modules';
@@ -8,7 +9,7 @@ import { Router } from '@angular/router';
 @Component({
   selector: 'app-photo-viewer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './photo-viewer.html',
   styleUrl: './photo-viewer.css',
 })
@@ -22,6 +23,12 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
   showInfo = true;
+
+  // Slideshow
+  isPlaying = false;
+  slideInterval = 15; // seconds
+  showSettings = false;
+  private timer: any = null;
 
   constructor(
     public photoService: PhotoService, 
@@ -37,6 +44,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.stopSlideshow();
     if (this.swiper) {
       this.swiper.destroy();
     }
@@ -103,7 +111,56 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onClose() {
+    this.stopSlideshow();
     this.close.emit();
+  }
+
+  // Slideshow methods
+  togglePlay(event?: Event) {
+    if (event) event.stopPropagation();
+    
+    if (this.isPlaying) {
+      this.stopSlideshow();
+    } else {
+      this.startSlideshow();
+    }
+  }
+
+  startSlideshow() {
+    this.isPlaying = true;
+    this.timer = setInterval(() => {
+      if (this.swiper) {
+        if (this.swiper.isEnd) {
+             this.swiper.slideTo(0);
+        } else {
+             this.swiper.slideNext();
+        }
+      }
+    }, this.slideInterval * 1000);
+  }
+
+  stopSlideshow() {
+    this.isPlaying = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  toggleSettings(event?: Event) {
+    if (event) event.stopPropagation();
+    this.showSettings = !this.showSettings;
+  }
+
+  updateInterval() {
+    // Clamp values
+    if (this.slideInterval < 0.2) this.slideInterval = 0.2;
+    if (this.slideInterval > 900) this.slideInterval = 900;
+
+    if (this.isPlaying) {
+      this.stopSlideshow();
+      this.startSlideshow();
+    }
   }
 
   ratePhoto(score: number, event?: Event) {

@@ -52,6 +52,33 @@
             <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
                 {{ score }}
             </button>
+
+            <div style="width: 1px; height: 40px; background: var(--border); margin: 0 0.5rem;"></div>
+
+            <button class="rating-btn" (click)="togglePlay($event)" [class.active]="isPlaying" title="Play/Pause Slideshow">
+                <svg *ngIf="!isPlaying" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+                <svg *ngIf="isPlaying" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+            </button>
+
+            <div style="position: relative;">
+                <button class="rating-btn" (click)="toggleSettings($event)" [class.active]="showSettings" title="Slideshow Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                         <circle cx="12" cy="12" r="10"></circle>
+                         <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </button>
+                
+                <div class="settings-popup" *ngIf="showSettings" (click)="$event.stopPropagation()">
+                    <div class="settings-row">
+                        <label>间隔(秒)</label>
+                        <input type="number" [(ngModel)]="slideInterval" (change)="updateInterval()" min="0.2" max="900" step="0.5">
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Rating buttons here if needed, or keeping it separate as in original overlay -->
