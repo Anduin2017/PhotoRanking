@@ -4,8 +4,8 @@
 [![Pipeline stat](https://gitlab.aiursoft.com/anduin/photoRanking/badges/master/pipeline.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/pipelines)
 [![Test Coverage](https://gitlab.aiursoft.com/anduin/photoRanking/badges/master/coverage.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/pipelines)
 [![Man hours](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoRanking.svg)](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoRanking.html)
-[![Website](https://img.shields.io/website?url=https%3A%2F%2FphotoRanking.aiursoft.com)](https://photoRanking.aiursoft.com)
-[![Docker](https://img.shields.io/docker/pulls/anduin/photoRanking.svg)](https://hub.docker.com/r/anduin/photoRanking)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2Franking.anduinlab.com)](https://ranking.anduinlab.com)
+[![Docker](https://img.shields.io/docker/pulls/anduin/photoranking.svg)](https://hub.docker.com/r/anduin/photoranking)
 
 PhotoRanking is a simple web application that allows users to upload photos and have others rank them. It is built using ASP.NET Core and Entity Framework Core, with a SQLite database for data storage.
 
