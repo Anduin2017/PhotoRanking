@@ -2,6 +2,61 @@
     <div *ngIf="isLoading" class="loading-spinner"></div>
 
     <div *ngIf="!isLoading && stats">
+
+        <!-- 0. Global Stats -->
+        <div class="stat-section" *ngIf="globalStats">
+            <h2 class="stat-section-title">全局状态</h2>
+            
+            <div class="global-stats-grid">
+                <div class="global-stat-card">
+                    <span class="global-stat-title">待评照片数</span>
+                    <span class="global-stat-value">{{ globalStats.waitingCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">已评照片数</span>
+                    <span class="global-stat-value">{{ globalStats.ratedCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">总照片数</span>
+                    <span class="global-stat-value">{{ globalStats.waitingCount + globalStats.ratedCount }}</span>
+                </div>
+                 <div class="global-stat-card">
+                    <span class="global-stat-title">完全已知相册</span>
+                    <span class="global-stat-value">{{ globalStats.fullyKnownAlbumCount }}</span>
+                </div>
+                 <div class="global-stat-card">
+                    <span class="global-stat-title">完全未知相册</span>
+                    <span class="global-stat-value">{{ globalStats.fullyUnknownAlbumCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">平均相册图片数</span>
+                    <span class="global-stat-value">{{ globalStats.averagePhotosPerAlbum | number:'1.1-1' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">平均相册已评率</span>
+                    <span class="global-stat-value">{{ globalStats.averageAlbumKnownRate | percent:'1.1-1' }}</span>
+                </div>
+                 <div class="global-stat-card">
+                    <span class="global-stat-title">总体分数均分</span>
+                    <span class="global-stat-value">{{ globalStats.overallAverageScore | number:'1.2-2' }}</span>
+                </div>
+            </div>
+
+            <div class="global-stat-card" style="margin-top: 1rem;">
+                <h3 style="margin-bottom: 1rem; font-size: 1.2rem; color: var(--text-primary);">分数分布</h3>
+                <div class="score-bars">
+                    <div *ngFor="let item of [5,4,3,2,1,0]" style="display: flex; align-items: center; margin-bottom: 0.5rem; gap: 1rem;">
+                        <span style="width: 30px; font-weight: bold; color: var(--text-primary);">{{ item }}分</span>
+                        <div style="flex: 1; height: 16px; background: var(--bg-secondary); border-radius: 8px; overflow: hidden;">
+                             <div [style.width.%]="(globalStats.ratedCount > 0 ? (globalStats.scoreDistribution[item] / globalStats.ratedCount * 100) : 0)" 
+                                  style="height: 100%; background: var(--primary); transition: width 0.5s ease;"></div>
+                        </div>
+                        <span style="width: 80px; text-align: right; color: var(--text-secondary); font-size: 0.9em;">{{ globalStats.scoreDistribution[item] }} ({{ (globalStats.ratedCount > 0 ? (globalStats.scoreDistribution[item] / globalStats.ratedCount) : 0) | percent:'1.1-1' }})</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 1. Top Albums by Score -->
         <div class="stat-section">
             <h2 class="stat-section-title">相册分最高的相册</h2>

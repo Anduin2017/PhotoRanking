@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PhotoService } from '../../services/photo';
+import { PhotoService, GlobalStats } from '../../services/photo';
 import { Router } from '@angular/router';
 
 @Component({
@@ -18,6 +18,7 @@ export class AdvancedComponent implements OnInit {
     topPhotosByScore: [],
     topPhotosByKnownness: []
   };
+  globalStats: GlobalStats | null = null;
 
   loadedCounts = {
     albumScore: 10,
@@ -29,6 +30,13 @@ export class AdvancedComponent implements OnInit {
   constructor(public photoService: PhotoService, private router: Router) { }
 
   ngOnInit() {
+    this.photoService.getGlobalStats().subscribe({
+      next: (data) => {
+        this.globalStats = data;
+      },
+      error: (err) => console.error('Error loading global stats', err)
+    });
+
     this.photoService.getTopStats().subscribe({
       next: (data) => {
         this.stats = data;

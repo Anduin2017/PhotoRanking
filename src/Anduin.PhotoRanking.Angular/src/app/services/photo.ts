@@ -33,6 +33,17 @@ export interface AlbumDetails {
   photos: Photo[];
 }
 
+export interface GlobalStats {
+  waitingCount: number;
+  ratedCount: number;
+  fullyUnknownAlbumCount: number;
+  fullyKnownAlbumCount: number;
+  scoreDistribution: { [key: number]: number };
+  averagePhotosPerAlbum: number;
+  averageAlbumKnownRate: number;
+  overallAverageScore: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -80,6 +91,10 @@ export class PhotoService {
       url += `&minScore=${minScore}`;
     }
     return this.http.get<Photo[]>(url);
+  }
+
+  getGlobalStats(): Observable<GlobalStats> {
+    return this.http.get<GlobalStats>(`${this.apiBase}/admin/global-stats`);
   }
 
   getTopStats(): Observable<any> {
