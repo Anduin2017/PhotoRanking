@@ -37,6 +37,7 @@ public class Startup : IWebStartup
         services.AddScoped<ScoringService>();
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
+        services.AddSingleton<VectorStorageService>();
 
         // Controllers and localization
         services.AddControllersWithViews()

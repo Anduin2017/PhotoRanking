@@ -3,8 +3,6 @@ using Anduin.PhotoRanking.Models;
 using Microsoft.EntityFrameworkCore;
 using Aiursoft.Canon;
 using System.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
-using System.Threading;
 
 namespace Anduin.PhotoRanking.Services;
 
@@ -135,6 +133,7 @@ public class SeederService(
                     {
                         using var scope = scopeFactory.CreateScope();
                         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var vectorStorage = scope.ServiceProvider.GetRequiredService<VectorStorageService>();
                         var photo = await dbContext.Photos.FindAsync(photoInfo.Id);
                         if (photo != null)
                         {
@@ -151,6 +150,10 @@ public class SeederService(
                                 if (photo.FeatureVector == null)
                                 {
                                     photo.FeatureVector = imageAnalysis.GenerateVector(fullPath);
+                                    if (photo.FeatureVector != null)
+                                    {
+                                        vectorStorage.UpdateOrAdd(photo.Id, photo.FeatureVector);
+                                    }
                                 }
                             }
                             await dbContext.SaveChangesAsync();

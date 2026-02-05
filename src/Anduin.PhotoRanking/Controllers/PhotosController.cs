@@ -13,12 +13,18 @@ public class PhotosController : ControllerBase
     private readonly AppDbContext _context;
     private readonly ScoringService _scoringService;
     private readonly ILogger<PhotosController> _logger;
+    private readonly VectorStorageService _vectorStorage;
 
-    public PhotosController(AppDbContext context, ScoringService scoringService, ILogger<PhotosController> logger)
+    public PhotosController(
+        AppDbContext context, 
+        ScoringService scoringService, 
+        ILogger<PhotosController> logger,
+        VectorStorageService vectorStorage)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
+        _vectorStorage = vectorStorage;
     }
 
     /// <summary>
@@ -289,14 +295,21 @@ public class PhotosController : ControllerBase
             return NotFound("Target photo or its feature vector not found.");
         }
 
+        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetPhoto.FeatureVector);
+        var similarIds = _vectorStorage.Search(targetVector, take + 1); // +1 because it includes itself
+        
+        // Filter out itself and ensure we have enough
+        similarIds = similarIds.Where(pid => pid != id).Take(take).ToList();
+
         var similarPhotos = await _context.Photos
-            .FromSqlInterpolated($@"
-                SELECT * FROM Photos 
-                WHERE Id != {id} AND FeatureVector IS NOT NULL
-                ORDER BY VectorDistance(FeatureVector, {targetPhoto.FeatureVector}) ASC
-                LIMIT {take}")
+            .Where(p => similarIds.Contains(p.Id))
             .Include(p => p.Album)
             .ToListAsync();
+            
+        // Re-order in memory because SQL 'IN' clause doesn't guarantee order
+        similarPhotos = similarPhotos
+            .OrderBy(p => similarIds.IndexOf(p.Id))
+            .ToList();
 
         return Ok(similarPhotos);
     }
@@ -319,18 +332,22 @@ public class PhotosController : ControllerBase
             }
 
             var service = HttpContext.RequestServices.GetRequiredService<ImageAnalysisService>();
-            var vector = service.GenerateVector(tempPath);
-            if (vector == null)
+            var vectorBytes = service.GenerateVector(tempPath);
+            if (vectorBytes == null)
                 return BadRequest("Could not generate vector for uploaded image.");
+                
+            var vector = ImageAnalysisService.ByteArrayToFloatArray(vectorBytes);
+            var similarIds = _vectorStorage.Search(vector, take);
 
             var similarPhotos = await _context.Photos
-                .FromSqlInterpolated($@"
-                    SELECT * FROM Photos 
-                    WHERE FeatureVector IS NOT NULL
-                    ORDER BY VectorDistance(FeatureVector, {vector}) ASC
-                    LIMIT {take}")
+                .Where(p => similarIds.Contains(p.Id))
                 .Include(p => p.Album)
                 .ToListAsync();
+
+            // Re-order
+            similarPhotos = similarPhotos
+                .OrderBy(p => similarIds.IndexOf(p.Id))
+                .ToList();
 
             return Ok(similarPhotos);
         }
