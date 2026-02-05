@@ -25,6 +25,7 @@ public class TestStartup : IWebStartup
 
         services.AddScoped<ScoringService>();
         services.AddScoped<SeederService>();
+        services.AddScoped<ImageAnalysisService>();
 
         // Controllers and localization
         services.AddSingleton<VectorStorageService>();
