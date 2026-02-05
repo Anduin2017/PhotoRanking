@@ -42,6 +42,8 @@ export interface GlobalStats {
   averagePhotosPerAlbum: number;
   averageAlbumKnownRate: number;
   overallAverageScore: number;
+  indexedPhotoCount: number;
+  totalPhotoCount: number;
 }
 
 @Injectable({

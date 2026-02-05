@@ -40,6 +40,28 @@
                     <span class="global-stat-title">总体分数均分</span>
                     <span class="global-stat-value">{{ globalStats.overallAverageScore | number:'1.2-2' }}</span>
                 </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">已索引照片</span>
+                    <span class="global-stat-value">{{ globalStats.indexedPhotoCount }} / {{ globalStats.totalPhotoCount }}</span>
+                </div>
+            </div>
+
+            <!-- Photo Indexing Progress Bar -->
+            <div class="global-stat-card" style="margin-top: 1rem;">
+                <h3 style="margin-bottom: 1rem; font-size: 1.2rem; color: var(--text-primary);">照片索引进度</h3>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="flex: 1; height: 24px; background: var(--bg-secondary); border-radius: 12px; overflow: hidden;">
+                        <div [style.width.%]="(globalStats.totalPhotoCount > 0 ? (globalStats.indexedPhotoCount / globalStats.totalPhotoCount * 100) : 0)" 
+                             style="height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px;">
+                            <span *ngIf="globalStats.indexedPhotoCount > 0" style="color: white; font-weight: bold; font-size: 0.85em;">
+                                {{ (globalStats.totalPhotoCount > 0 ? (globalStats.indexedPhotoCount / globalStats.totalPhotoCount) : 0) | percent:'1.1-1' }}
+                            </span>
+                        </div>
+                    </div>
+                    <span style="min-width: 120px; text-align: right; color: var(--text-secondary); font-size: 0.9em;">
+                        {{ globalStats.indexedPhotoCount }} / {{ globalStats.totalPhotoCount }}
+                    </span>
+                </div>
             </div>
 
             <div class="global-stat-card" style="margin-top: 1rem;">

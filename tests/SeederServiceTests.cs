@@ -3,6 +3,8 @@ using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Aiursoft.Canon;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Anduin.PhotoRanking.Tests;
 
@@ -11,6 +13,21 @@ public class SeederServiceTests
 {
     private AppDbContext _context = null!;
     private string _tempPath = null!;
+
+    private static void CreateTestImage(string path)
+    {
+        // Create a simple valid 32x32 image that can be processed by ImageAnalysisService
+        using var image = new Image<Rgba32>(32, 32);
+        // Fill with some pixel data
+        for (int y = 0; y < 32; y++)
+        {
+            for (int x = 0; x < 32; x++)
+            {
+                image[x, y] = new Rgba32((byte)(x * 8), (byte)(y * 8), 128);
+            }
+        }
+        image.SaveAsPng(path);
+    }
 
     [TestInitialize]
     public void Setup()
@@ -42,8 +59,8 @@ public class SeederServiceTests
         Directory.CreateDirectory(album1Path);
         var photo1Path = Path.Combine(album1Path, "photo1.jpg");
         var photo2Path = Path.Combine(album1Path, "photo2.jpg");
-        await File.WriteAllBytesAsync(photo1Path, [0x01]);
-        await File.WriteAllBytesAsync(photo2Path, [0x01]);
+        CreateTestImage(photo1Path);
+        CreateTestImage(photo2Path);
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -90,7 +107,7 @@ public class SeederServiceTests
         var album1Path = Path.Combine(_tempPath, "Album1");
         Directory.CreateDirectory(album1Path);
         var photo1Path = Path.Combine(album1Path, "photo1.jpg");
-        await File.WriteAllBytesAsync(photo1Path, [0x01]);
+        CreateTestImage(photo1Path);
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -135,7 +152,7 @@ public class SeederServiceTests
         var album1Path = Path.Combine(_tempPath, "Album1");
         Directory.CreateDirectory(album1Path);
         var photo1Path = Path.Combine(album1Path, "photo1.jpg");
-        await File.WriteAllBytesAsync(photo1Path, [0x01]);
+        CreateTestImage(photo1Path);
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

@@ -10,4 +10,6 @@ public class GlobalStats
     public double AveragePhotosPerAlbum { get; set; }
     public double AverageAlbumKnownRate { get; set; }
     public double OverallAverageScore { get; set; }
+    public int IndexedPhotoCount { get; set; }
+    public int TotalPhotoCount { get; set; }
 }

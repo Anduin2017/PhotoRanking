@@ -39,6 +39,9 @@ public class AdminController : ControllerBase
 
         var totalPhotos = waitingCount + photoScores.Count;
         var totalAlbums = albumStats.Count;
+        
+        // 查询已索引的照片数量（有 FeatureVector 的照片）
+        var indexedPhotoCount = await _dbContext.Photos.CountAsync(p => p.FeatureVector != null);
 
         var stats = new GlobalStats
         {
@@ -49,7 +52,9 @@ public class AdminController : ControllerBase
             AveragePhotosPerAlbum = totalAlbums > 0 ? (double)totalPhotos / totalAlbums : 0,
             AverageAlbumKnownRate = totalAlbums > 0 ? albumStats.Average(a => a.KnownRate) : 0,
             OverallAverageScore = photoScores.Any() ? photoScores.Average() : 0,
-            ScoreDistribution = new Dictionary<int, int>()
+            ScoreDistribution = new Dictionary<int, int>(),
+            IndexedPhotoCount = indexedPhotoCount,
+            TotalPhotoCount = totalPhotos
         };
 
         // Initialize 0-5 keys
