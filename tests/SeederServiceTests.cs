@@ -2,6 +2,8 @@ using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using Aiursoft.Canon;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Anduin.PhotoRanking.Tests;
 
@@ -53,7 +55,16 @@ public class SeederServiceTests
 
         var loggerMock = new Mock<ILogger<SeederService>>();
         var analysisService = new ImageAnalysisService();
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService);
+        var canonPool = new CanonPool(new Mock<ILogger<CanonPool>>().Object);
+        var scopeMock = new Mock<IServiceScope>();
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var serviceProviderMock = new Mock<IServiceProvider>();
+
+        serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
+        scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
+        scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
+
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -91,7 +102,16 @@ public class SeederServiceTests
 
         var loggerMock = new Mock<ILogger<SeederService>>();
         var analysisService = new ImageAnalysisService();
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService);
+        var canonPool = new CanonPool(new Mock<ILogger<CanonPool>>().Object);
+        var scopeMock = new Mock<IServiceScope>();
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var serviceProviderMock = new Mock<IServiceProvider>();
+
+        serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
+        scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
+        scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
+
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -127,7 +147,16 @@ public class SeederServiceTests
 
         var loggerMock = new Mock<ILogger<SeederService>>();
         var analysisService = new ImageAnalysisService();
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService);
+        var canonPool = new CanonPool(new Mock<ILogger<CanonPool>>().Object);
+        var scopeMock = new Mock<IServiceScope>();
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var serviceProviderMock = new Mock<IServiceProvider>();
+
+        serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
+        scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
+        scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
+
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();

@@ -1,6 +1,10 @@
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
 using Microsoft.EntityFrameworkCore;
+using Aiursoft.Canon;
+using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using System.Threading;
 
 namespace Anduin.PhotoRanking.Services;
 
@@ -8,7 +12,9 @@ public class SeederService(
     AppDbContext context, 
     IConfiguration configuration, 
     ILogger<SeederService> logger,
-    ImageAnalysisService imageAnalysis)
+    ImageAnalysisService imageAnalysis,
+    IServiceScopeFactory scopeFactory,
+    CanonPool canonPool)
 {
     public async Task SeedAsync()
     {
@@ -110,31 +116,61 @@ public class SeederService(
         // Update metadata for existing photos if missing
         var photosMissingMetadata = await context.Photos
             .Where(p => p.FileSize == 0 || p.FeatureVector == null)
+            .Select(p => new { p.Id, p.FilePath, p.FileSize, p.FeatureVector })
             .ToListAsync();
 
         if (photosMissingMetadata.Count > 0)
         {
-            logger.LogInformation("Updating metadata and vectors for {Count} existing photos...", photosMissingMetadata.Count);
-            foreach (var photo in photosMissingMetadata)
-            {
-                var fullPath = Path.Combine(photoRootPath, photo.FilePath);
-                if (File.Exists(fullPath))
-                {
-                    var fi = new FileInfo(fullPath);
-                    if (photo.FileSize == 0)
-                    {
-                        photo.FileSize = fi.Length;
-                        photo.LastModified = fi.LastWriteTimeUtc;
-                    }
+            logger.LogInformation("Updating metadata and vectors for {Count} photos using 16 concurrency...", photosMissingMetadata.Count);
+            var sw = Stopwatch.StartNew();
+            var processedCount = 0;
+            var batchSize = 1000;
 
-                    if (photo.FeatureVector == null)
+            for (int i = 0; i < photosMissingMetadata.Count; i += batchSize)
+            {
+                var batch = photosMissingMetadata.Skip(i).Take(batchSize).ToList();
+                foreach (var photoInfo in batch)
+                {
+                    canonPool.RegisterNewTaskToPool(async () =>
                     {
-                        photo.FeatureVector = imageAnalysis.GenerateVector(fullPath);
-                    }
+                        using var scope = scopeFactory.CreateScope();
+                        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var photo = await dbContext.Photos.FindAsync(photoInfo.Id);
+                        if (photo != null)
+                        {
+                            var fullPath = Path.Combine(photoRootPath, photo.FilePath);
+                            if (File.Exists(fullPath))
+                            {
+                                var fi = new FileInfo(fullPath);
+                                if (photo.FileSize == 0)
+                                {
+                                    photo.FileSize = fi.Length;
+                                    photo.LastModified = fi.LastWriteTimeUtc;
+                                }
+
+                                if (photo.FeatureVector == null)
+                                {
+                                    photo.FeatureVector = imageAnalysis.GenerateVector(fullPath);
+                                }
+                            }
+                            await dbContext.SaveChangesAsync();
+                        }
+                        
+                        var current = Interlocked.Increment(ref processedCount);
+                        if (current % 100 == 0 || current == photosMissingMetadata.Count)
+                        {
+                            var speed = current / sw.Elapsed.TotalSeconds;
+                            logger.LogInformation("Processed {Current}/{Total} photos ({Percentage:P1}). Speed: {Speed:F2} photos/s. Elapsed: {Elapsed}",
+                                current, photosMissingMetadata.Count, (double)current / photosMissingMetadata.Count, speed, sw.Elapsed);
+                        }
+                    });
                 }
+                await canonPool.RunAllTasksInPoolAsync(16);
             }
-            await context.SaveChangesAsync();
-            logger.LogInformation("Metadata and vectors updated.");
+            
+            sw.Stop();
+            logger.LogInformation("Metadata and vectors update completed in {Elapsed}. Average speed: {Speed:F2} photos/s", 
+                sw.Elapsed, photosMissingMetadata.Count / sw.Elapsed.TotalSeconds);
         }
 
         // 更新相册统计
@@ -218,7 +254,7 @@ public class SeederService(
                         CreatedAt = DateTime.UtcNow,
                         FileSize = fileInfo.Length,
                         LastModified = fileInfo.LastWriteTimeUtc,
-                        FeatureVector = imageAnalysis.GenerateVector(photoFile)
+                        FeatureVector = null
                     };
 
                     photosToAdd.Add(newPhoto);
