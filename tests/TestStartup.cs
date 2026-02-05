@@ -28,7 +28,6 @@ public class TestStartup : IWebStartup
         services.AddScoped<ImageAnalysisService>();
 
         // Controllers and localization
-        services.AddSingleton<VectorStorageService>();
         services.AddControllersWithViews()
             .AddNewtonsoftJson(options =>
             {

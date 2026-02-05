@@ -3,6 +3,9 @@ using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Aiursoft.Canon;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Anduin.PhotoRanking.Tests;
 
@@ -58,10 +61,8 @@ public class SeederServiceTests
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var vectorStorageMock = new Mock<VectorStorageService>(scopeFactoryMock.Object, new Mock<ILogger<VectorStorageService>>().Object);
 
         serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
-        serviceProviderMock.Setup(x => x.GetService(typeof(VectorStorageService))).Returns(vectorStorageMock.Object);
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
@@ -107,10 +108,8 @@ public class SeederServiceTests
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var vectorStorageMock = new Mock<VectorStorageService>(scopeFactoryMock.Object, new Mock<ILogger<VectorStorageService>>().Object);
 
         serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
-        serviceProviderMock.Setup(x => x.GetService(typeof(VectorStorageService))).Returns(vectorStorageMock.Object);
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
@@ -154,10 +153,8 @@ public class SeederServiceTests
         var scopeMock = new Mock<IServiceScope>();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var serviceProviderMock = new Mock<IServiceProvider>();
-        var vectorStorageMock = new Mock<VectorStorageService>(scopeFactoryMock.Object, new Mock<ILogger<VectorStorageService>>().Object);
 
         serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
-        serviceProviderMock.Setup(x => x.GetService(typeof(VectorStorageService))).Returns(vectorStorageMock.Object);
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 

@@ -13,7 +13,6 @@ public class PhotosController : ControllerBase
     private readonly AppDbContext _context;
     private readonly ScoringService _scoringService;
     private readonly ILogger<PhotosController> _logger;
-    private readonly VectorStorageService _vectorStorage;
     private readonly ImageAnalysisService _imageAnalysis;
     private readonly IConfiguration _configuration;
 
@@ -21,14 +20,12 @@ public class PhotosController : ControllerBase
         AppDbContext context, 
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
-        VectorStorageService vectorStorage,
         ImageAnalysisService imageAnalysis,
         IConfiguration configuration)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
-        _vectorStorage = vectorStorage;
         _imageAnalysis = imageAnalysis;
         _configuration = configuration;
     }
@@ -322,7 +319,6 @@ public class PhotosController : ControllerBase
                 if (vector != null)
                 {
                     targetPhoto.FeatureVector = vector;
-                    _vectorStorage.UpdateOrAdd(targetPhoto.Id, vector);
                     await _context.SaveChangesAsync();
                 }
                 else
@@ -337,21 +333,14 @@ public class PhotosController : ControllerBase
             }
         }
 
-        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetPhoto.FeatureVector);
-        var similarIds = _vectorStorage.Search(targetVector, take + 1); // +1 because it includes itself
-        
-        // Filter out itself and ensure we have enough
-        similarIds = similarIds.Where(pid => pid != id).Take(take).ToList();
-
         var similarPhotos = await _context.Photos
-            .Where(p => similarIds.Contains(p.Id))
+            .FromSqlInterpolated($@"
+                SELECT * FROM Photos 
+                WHERE Id != {id} AND FeatureVector IS NOT NULL
+                ORDER BY VectorDistance(FeatureVector, {targetPhoto.FeatureVector}) ASC
+                LIMIT {take}")
             .Include(p => p.Album)
             .ToListAsync();
-            
-        // Re-order in memory because SQL 'IN' clause doesn't guarantee order
-        similarPhotos = similarPhotos
-            .OrderBy(p => similarIds.IndexOf(p.Id))
-            .ToList();
 
         return Ok(similarPhotos);
     }
@@ -373,23 +362,18 @@ public class PhotosController : ControllerBase
                 await file.CopyToAsync(stream);
             }
 
-            var service = HttpContext.RequestServices.GetRequiredService<ImageAnalysisService>();
-            var vectorBytes = service.GenerateVector(tempPath);
+            var vectorBytes = _imageAnalysis.GenerateVector(tempPath);
             if (vectorBytes == null)
                 return BadRequest("Could not generate vector for uploaded image.");
                 
-            var vector = ImageAnalysisService.ByteArrayToFloatArray(vectorBytes);
-            var similarIds = _vectorStorage.Search(vector, take);
-
             var similarPhotos = await _context.Photos
-                .Where(p => similarIds.Contains(p.Id))
+                .FromSqlInterpolated($@"
+                    SELECT * FROM Photos 
+                    WHERE FeatureVector IS NOT NULL
+                    ORDER BY VectorDistance(FeatureVector, {vectorBytes}) ASC
+                    LIMIT {take}")
                 .Include(p => p.Album)
                 .ToListAsync();
-
-            // Re-order
-            similarPhotos = similarPhotos
-                .OrderBy(p => similarIds.IndexOf(p.Id))
-                .ToList();
 
             return Ok(similarPhotos);
         }
