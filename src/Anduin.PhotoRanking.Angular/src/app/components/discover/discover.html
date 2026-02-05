@@ -65,8 +65,18 @@
     </div>
 </div>
 
-<app-photo-viewer *ngIf="viewerOpen"
-                  [startPhotoId]="initialPhotoId"
-                  [photos]="photos"
-                  (close)="closeViewer()">
-</app-photo-viewer>
+    <app-photo-viewer *ngIf="viewerOpen" 
+
+        [startPhotoId]="initialPhotoId" 
+
+        [photos]="photos" 
+
+        [hasMore]="hasMore"
+
+        (requestMore)="loadMore()"
+
+        (close)="closeViewer()">
+
+    </app-photo-viewer>
+
+

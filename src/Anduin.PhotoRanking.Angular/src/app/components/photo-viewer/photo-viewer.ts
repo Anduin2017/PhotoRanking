@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener, ChangeDetectorRef } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener, ChangeDetectorRef, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Photo, PhotoService } from '../../services/photo';
@@ -13,10 +13,12 @@ import { Router } from '@angular/router';
   templateUrl: './photo-viewer.html',
   styleUrl: './photo-viewer.css',
 })
-export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
+export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges {
   @Input() startPhotoId: number | null = null;
   @Input() photos: Photo[] = [];
+  @Input() hasMore = false;
   @Output() close = new EventEmitter<void>();
+  @Output() requestMore = new EventEmitter<void>();
 
   @ViewChild('swiperContainer') swiperContainer!: ElementRef;
 
@@ -37,6 +39,15 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     // Swiper init happens in ngAfterViewInit
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['photos'] && !changes['photos'].firstChange) {
+      if (this.swiper && this.swiper.virtual) {
+        this.swiper.virtual.slides = this.photos;
+        this.swiper.virtual.update(true);
+      }
+    }
   }
 
   ngAfterViewInit() {
@@ -82,6 +93,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
           const index = this.swiper?.activeIndex || 0;
           if (this.photos[index]) {
             this.updateOverlay(this.photos[index].id);
+          }
+
+          if (index >= this.photos.length - 5) {
+            this.requestMore.emit();
           }
         },
         click: () => {
@@ -131,9 +146,13 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.timer = setInterval(() => {
       if (this.swiper) {
         if (this.swiper.isEnd) {
-             this.swiper.slideTo(0);
+          if (!this.hasMore) {
+            this.swiper.slideTo(0);
+          }
+          // If hasMore is true, we just stay at the end and wait for new photos to arrive.
+          // Once new photos arrive, isEnd will become false in the next interval.
         } else {
-             this.swiper.slideNext();
+          this.swiper.slideNext();
         }
       }
     }, this.slideInterval * 1000);
