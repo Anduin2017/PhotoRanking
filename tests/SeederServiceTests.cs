@@ -52,7 +52,7 @@ public class SeederServiceTests
             })
             .Build();
 
-        var loggerMock = new Mock<ILogger<SeederService>>();
+        var loggerMock = new Mock<ILogger<SeederService>>(MockBehavior.Loose);
         var analysisService = new ImageAnalysisService();
         var canonPool = new CanonPool(new Mock<ILogger<CanonPool>>().Object);
         var scopeMock = new Mock<IServiceScope>();
@@ -99,7 +99,7 @@ public class SeederServiceTests
             })
             .Build();
 
-        var loggerMock = new Mock<ILogger<SeederService>>();
+        var loggerMock = new Mock<ILogger<SeederService>>(MockBehavior.Loose);
         var analysisService = new ImageAnalysisService();
         var canonPool = new CanonPool(new Mock<ILogger<CanonPool>>().Object);
         var scopeMock = new Mock<IServiceScope>();
@@ -144,7 +144,7 @@ public class SeederServiceTests
             })
             .Build();
 
-        var loggerMock = new Mock<ILogger<SeederService>>();
+        var loggerMock = new Mock<ILogger<SeederService>>(MockBehavior.Loose);
         var analysisService = new ImageAnalysisService();
         var canonPool = new CanonPool(new Mock<ILogger<CanonPool>>().Object);
         var scopeMock = new Mock<IServiceScope>();
