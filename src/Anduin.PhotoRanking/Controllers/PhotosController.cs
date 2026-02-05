@@ -14,17 +14,23 @@ public class PhotosController : ControllerBase
     private readonly ScoringService _scoringService;
     private readonly ILogger<PhotosController> _logger;
     private readonly VectorStorageService _vectorStorage;
+    private readonly ImageAnalysisService _imageAnalysis;
+    private readonly IConfiguration _configuration;
 
     public PhotosController(
         AppDbContext context, 
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
-        VectorStorageService vectorStorage)
+        VectorStorageService vectorStorage,
+        ImageAnalysisService imageAnalysis,
+        IConfiguration configuration)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
         _vectorStorage = vectorStorage;
+        _imageAnalysis = imageAnalysis;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -290,9 +296,45 @@ public class PhotosController : ControllerBase
     public async Task<ActionResult<List<Photo>>> GetSimilar(int id, [FromQuery] int take = 10)
     {
         var targetPhoto = await _context.Photos.FindAsync(id);
-        if (targetPhoto == null || targetPhoto.FeatureVector == null)
+        if (targetPhoto == null)
         {
-            return NotFound("Target photo or its feature vector not found.");
+            return NotFound("Target photo not found.");
+        }
+
+        // Lazy generation if vector is missing
+        if (targetPhoto.FeatureVector == null)
+        {
+            var photoRootPath = _configuration["PhotoRootPath"];
+            if (string.IsNullOrEmpty(photoRootPath))
+            {
+                return StatusCode(500, "PhotoRootPath not configured.");
+            }
+
+            var fullPath = Path.Combine(photoRootPath, targetPhoto.FilePath);
+            if (!System.IO.File.Exists(fullPath))
+            {
+                return NotFound("Photo file not found on disk.");
+            }
+
+            try
+            {
+                var vector = _imageAnalysis.GenerateVector(fullPath);
+                if (vector != null)
+                {
+                    targetPhoto.FeatureVector = vector;
+                    _vectorStorage.UpdateOrAdd(targetPhoto.Id, vector);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    return BadRequest("Failed to generate feature vector for this image.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating vector for photo {Id}", id);
+                return StatusCode(500, "Internal error during vector generation.");
+            }
         }
 
         var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetPhoto.FeatureVector);
