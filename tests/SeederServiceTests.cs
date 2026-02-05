@@ -3,9 +3,6 @@ using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Aiursoft.Canon;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Anduin.PhotoRanking.Tests;
 
