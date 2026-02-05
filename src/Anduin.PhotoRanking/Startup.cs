@@ -17,9 +17,16 @@ public class Startup : IWebStartup
         var connectionString = configuration.GetConnectionString("DefaultConnection")!;
         var allowCache = configuration.GetSection("ConnectionStrings:AllowCache").Get<bool>();
         services.AddAiurSqliteWithCache<AppDbContext>(
-            connectionString,
+            connectionString: connectionString,
             splitQuery: false,
-            allowCache: allowCache);
+            allowCache: allowCache,
+            onConnectionOpen: (conn) =>
+            {
+                if (conn is Microsoft.Data.Sqlite.SqliteConnection sqliteConn)
+                {
+                    SqliteVectorFunctions.RegisterVectorDistance(sqliteConn);
+                }
+            });
 
         // Services
         services.AddMemoryCache();
@@ -27,6 +34,7 @@ public class Startup : IWebStartup
 
         services.AddScoped<ScoringService>();
         services.AddScoped<SeederService>();
+        services.AddScoped<ImageAnalysisService>();
 
         // Controllers and localization
         services.AddControllersWithViews()

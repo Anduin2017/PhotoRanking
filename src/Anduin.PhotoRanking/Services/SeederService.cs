@@ -4,7 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Anduin.PhotoRanking.Services;
 
-public class SeederService(AppDbContext context, IConfiguration configuration, ILogger<SeederService> logger)
+public class SeederService(
+    AppDbContext context, 
+    IConfiguration configuration, 
+    ILogger<SeederService> logger,
+    ImageAnalysisService imageAnalysis)
 {
     public async Task SeedAsync()
     {
@@ -105,24 +109,32 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
 
         // Update metadata for existing photos if missing
         var photosMissingMetadata = await context.Photos
-            .Where(p => p.FileSize == 0)
+            .Where(p => p.FileSize == 0 || p.FeatureVector == null)
             .ToListAsync();
 
         if (photosMissingMetadata.Count > 0)
         {
-            logger.LogInformation("Updating metadata for {Count} existing photos...", photosMissingMetadata.Count);
+            logger.LogInformation("Updating metadata and vectors for {Count} existing photos...", photosMissingMetadata.Count);
             foreach (var photo in photosMissingMetadata)
             {
                 var fullPath = Path.Combine(photoRootPath, photo.FilePath);
                 if (File.Exists(fullPath))
                 {
                     var fi = new FileInfo(fullPath);
-                    photo.FileSize = fi.Length;
-                    photo.LastModified = fi.LastWriteTimeUtc;
+                    if (photo.FileSize == 0)
+                    {
+                        photo.FileSize = fi.Length;
+                        photo.LastModified = fi.LastWriteTimeUtc;
+                    }
+
+                    if (photo.FeatureVector == null)
+                    {
+                        photo.FeatureVector = imageAnalysis.GenerateVector(fullPath);
+                    }
                 }
             }
             await context.SaveChangesAsync();
-            logger.LogInformation("Metadata updated.");
+            logger.LogInformation("Metadata and vectors updated.");
         }
 
         // 更新相册统计
@@ -205,7 +217,8 @@ public class SeederService(AppDbContext context, IConfiguration configuration, I
                         ViewCount = 0,
                         CreatedAt = DateTime.UtcNow,
                         FileSize = fileInfo.Length,
-                        LastModified = fileInfo.LastWriteTimeUtc
+                        LastModified = fileInfo.LastWriteTimeUtc,
+                        FeatureVector = imageAnalysis.GenerateVector(photoFile)
                     };
 
                     photosToAdd.Add(newPhoto);

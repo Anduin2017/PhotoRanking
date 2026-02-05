@@ -278,6 +278,70 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
+    /// 获取与指定照片相似的照片
+    /// </summary>
+    [HttpGet("{id}/similar")]
+    public async Task<ActionResult<List<Photo>>> GetSimilar(int id, [FromQuery] int take = 10)
+    {
+        var targetPhoto = await _context.Photos.FindAsync(id);
+        if (targetPhoto == null || targetPhoto.FeatureVector == null)
+        {
+            return NotFound("Target photo or its feature vector not found.");
+        }
+
+        var similarPhotos = await _context.Photos
+            .FromSqlInterpolated($@"
+                SELECT * FROM Photos 
+                WHERE Id != {id} AND FeatureVector IS NOT NULL
+                ORDER BY VectorDistance(FeatureVector, {targetPhoto.FeatureVector}) ASC
+                LIMIT {take}")
+            .Include(p => p.Album)
+            .ToListAsync();
+
+        return Ok(similarPhotos);
+    }
+
+    /// <summary>
+    /// 上传图片搜索相似内容
+    /// </summary>
+    [HttpPost("search-by-image")]
+    public async Task<ActionResult<List<Photo>>> SearchByImage(IFormFile? file, [FromQuery] int take = 10)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file uploaded.");
+
+        var tempPath = Path.GetTempFileName();
+        try
+        {
+            using (var stream = new FileStream(tempPath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var service = HttpContext.RequestServices.GetRequiredService<ImageAnalysisService>();
+            var vector = service.GenerateVector(tempPath);
+            if (vector == null)
+                return BadRequest("Could not generate vector for uploaded image.");
+
+            var similarPhotos = await _context.Photos
+                .FromSqlInterpolated($@"
+                    SELECT * FROM Photos 
+                    WHERE FeatureVector IS NOT NULL
+                    ORDER BY VectorDistance(FeatureVector, {vector}) ASC
+                    LIMIT {take}")
+                .Include(p => p.Album)
+                .ToListAsync();
+
+            return Ok(similarPhotos);
+        }
+        finally
+        {
+            if (System.IO.File.Exists(tempPath))
+                System.IO.File.Delete(tempPath);
+        }
+    }
+
+    /// <summary>
     /// 获取高级统计页面数据
     /// </summary>
     [HttpGet("stats/top")]

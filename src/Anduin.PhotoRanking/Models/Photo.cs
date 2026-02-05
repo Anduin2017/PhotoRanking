@@ -67,5 +67,10 @@ public class Photo
 
     public long FileSize { get; set; }
 
+    /// <summary>
+    /// 图像特征向量
+    /// </summary>
+    public byte[]? FeatureVector { get; set; }
+
     public DateTime LastModified { get; set; } = DateTime.UtcNow;
 }

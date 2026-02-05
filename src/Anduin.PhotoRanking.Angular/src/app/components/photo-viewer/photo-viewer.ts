@@ -202,6 +202,14 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  viewSimilar(event?: Event) {
+    if(event) event.stopPropagation();
+    if (this.currentPhoto) {
+      this.onClose();
+      this.router.navigate(['/similar', this.currentPhoto.id]);
+    }
+  }
+
   @HostListener('window:wheel', ['$event'])
   onWheel(event: WheelEvent) {
     if (this.swiper && this.swiper.zoom) {

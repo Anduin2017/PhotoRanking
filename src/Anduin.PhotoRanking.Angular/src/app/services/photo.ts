@@ -104,4 +104,8 @@ export class PhotoService {
   getMoreStats(endpoint: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiBase}/${endpoint}`);
   }
+
+  getSimilarPhotos(id: number, take: number = 20): Observable<Photo[]> {
+    return this.http.get<Photo[]>(`${this.apiBase}/photos/${id}/similar?take=${take}`);
+  }
 }

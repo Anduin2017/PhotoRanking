@@ -5,6 +5,7 @@ import { BrowserComponent } from './components/browser/browser';
 
 import { AlbumComponent } from './components/album/album';
 import { AdvancedComponent } from './components/advanced/advanced';
+import { SimilarComponent } from './components/similar/similar';
 
 export const routes: Routes = [
     { path: '', redirectTo: 'feed', pathMatch: 'full' },
@@ -13,4 +14,5 @@ export const routes: Routes = [
     { path: 'browser', component: BrowserComponent },
     { path: 'advanced', component: AdvancedComponent },
     { path: 'album/:id', component: AlbumComponent },
+    { path: 'similar/:id', component: SimilarComponent },
 ];

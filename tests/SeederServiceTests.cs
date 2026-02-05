@@ -52,7 +52,8 @@ public class SeederServiceTests
             .Build();
 
         var loggerMock = new Mock<ILogger<SeederService>>();
-        var seeder = new SeederService(_context, configuration, loggerMock.Object);
+        var analysisService = new ImageAnalysisService();
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -89,7 +90,8 @@ public class SeederServiceTests
             .Build();
 
         var loggerMock = new Mock<ILogger<SeederService>>();
-        var seeder = new SeederService(_context, configuration, loggerMock.Object);
+        var analysisService = new ImageAnalysisService();
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -124,7 +126,8 @@ public class SeederServiceTests
             .Build();
 
         var loggerMock = new Mock<ILogger<SeederService>>();
-        var seeder = new SeederService(_context, configuration, loggerMock.Object);
+        var analysisService = new ImageAnalysisService();
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService);
 
         // 2. Initial seed
         await seeder.SeedAsync();

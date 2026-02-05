@@ -1,0 +1,33 @@
+<div class="album-page-container main-content">
+    <!-- Header -->
+    <div class="album-header">
+        <div class="album-title-section">
+            <h1 class="album-title">Similar Photos</h1>
+            <div class="album-meta">Target Photo ID: {{ targetId }}</div>
+        </div>
+    </div>
+
+    <!-- Photos Grid -->
+    <div class="discover-photos-grid" *ngIf="!isLoading">
+        <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
+            <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
+            <div class="discover-item-overlay">
+                <div class="discover-item-score">Score: {{ photo.overallScore | number:'1.2-2' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div *ngIf="!isLoading && photos.length === 0" style="text-align: center; color: var(--text-secondary); padding: 50px;">
+        No similar photos found.
+    </div>
+</div>
+
+<div *ngIf="isLoading" class="loading-indicator">
+    <div class="loading-spinner"></div>
+</div>
+
+<app-photo-viewer *ngIf="viewerOpen"
+                  [startPhotoId]="initialPhotoId"
+                  [photos]="photos"
+                  (close)="closeViewer()">
+</app-photo-viewer>
