@@ -12,7 +12,8 @@ public class SeederService(
     ILogger<SeederService> logger,
     ImageAnalysisService imageAnalysis,
     IServiceScopeFactory scopeFactory,
-    CanonPool canonPool)
+    CanonPool canonPool,
+    VectorStorageService vectorStorage)
 {
     public async Task SeedAsync()
     {
