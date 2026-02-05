@@ -112,62 +112,64 @@ public class SeederService(
             albumsToAdd.Count, photosToAdd.Count, photosToRemove.Count, albumsToRemove.Count, photosSkipped);
 
         // Update metadata for existing photos if missing
-        // Batch query to avoid OOM on 400k+ records
-        var batchCount = 0;
-        const int queryBatchSize = 10000;
-        
-        while (true)
+        // Fetch IDs first to avoid infinite loops if update fails and to manage memory
+        var allIdsToUpdate = await context.Photos
+            .Where(p => p.FileSize == 0 || p.FeatureVector == null)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        if (allIdsToUpdate.Count > 0)
         {
-            var photosToUpdate = await context.Photos
-                .Where(p => p.FileSize == 0 || p.FeatureVector == null)
-                .Select(p => new { p.Id, p.FilePath, p.FileSize, p.FeatureVector })
-                .Take(queryBatchSize)
-                .ToListAsync();
-
-            if (photosToUpdate.Count == 0) break;
-
-            logger.LogInformation("Updating batch of {Count} photos (Total processed: {Processed})...", photosToUpdate.Count, batchCount);
+            logger.LogInformation("Updating metadata and vectors for {Count} photos using 16 concurrency...", allIdsToUpdate.Count);
             var sw = Stopwatch.StartNew();
-            var processedInBatch = 0;
+            var processedCount = 0;
+            const int batchSize = 1000;
 
-            foreach (var photoInfo in photosToUpdate)
+            for (int i = 0; i < allIdsToUpdate.Count; i += batchSize)
             {
-                canonPool.RegisterNewTaskToPool(async () =>
+                var batchIds = allIdsToUpdate.Skip(i).Take(batchSize).ToList();
+                foreach (var photoId in batchIds)
                 {
-                    using var scope = scopeFactory.CreateScope();
-                    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var photo = await dbContext.Photos.FindAsync(photoInfo.Id);
-                    if (photo != null)
+                    canonPool.RegisterNewTaskToPool(async () =>
                     {
-                        var fullPath = Path.Combine(photoRootPath, photo.FilePath);
-                        if (File.Exists(fullPath))
+                        using var scope = scopeFactory.CreateScope();
+                        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var photo = await dbContext.Photos.FindAsync(photoId);
+                        if (photo != null)
                         {
-                            var fi = new FileInfo(fullPath);
-                            if (photo.FileSize == 0)
+                            var fullPath = Path.Combine(photoRootPath, photo.FilePath);
+                            if (File.Exists(fullPath))
                             {
-                                photo.FileSize = fi.Length;
-                                photo.LastModified = fi.LastWriteTimeUtc;
-                            }
+                                var fi = new FileInfo(fullPath);
+                                if (photo.FileSize == 0)
+                                {
+                                    photo.FileSize = fi.Length;
+                                    photo.LastModified = fi.LastWriteTimeUtc;
+                                }
 
-                            if (photo.FeatureVector == null)
-                            {
-                                photo.FeatureVector = imageAnalysis.GenerateVector(fullPath);
+                                if (photo.FeatureVector == null)
+                                {
+                                    photo.FeatureVector = imageAnalysis.GenerateVector(fullPath);
+                                }
                             }
+                            await dbContext.SaveChangesAsync();
                         }
-                        await dbContext.SaveChangesAsync();
-                    }
 
-                    var current = Interlocked.Increment(ref processedInBatch);
-                    if (current % 500 == 0 || current == photosToUpdate.Count)
-                    {
-                        logger.LogInformation("  -> Batch progress: {Current}/{Total}. Speed: {Speed:F2} photos/s", 
-                            current, photosToUpdate.Count, current / sw.Elapsed.TotalSeconds);
-                    }
-                });
+                        var current = Interlocked.Increment(ref processedCount);
+                        if (current % 500 == 0 || current == allIdsToUpdate.Count)
+                        {
+                            var speed = current / sw.Elapsed.TotalSeconds;
+                            logger.LogInformation("Processed {Current}/{Total} photos ({Percentage:P1}). Speed: {Speed:F2} photos/s. Elapsed: {Elapsed}",
+                                current, allIdsToUpdate.Count, (double)current / allIdsToUpdate.Count, speed, sw.Elapsed);
+                        }
+                    });
+                }
+                await canonPool.RunAllTasksInPoolAsync(16);
             }
-            await canonPool.RunAllTasksInPoolAsync(16);
-            batchCount += photosToUpdate.Count;
-            logger.LogInformation("Batch completed. Speed: {Speed:F2} photos/s", photosToUpdate.Count / sw.Elapsed.TotalSeconds);
+            
+            sw.Stop();
+            logger.LogInformation("Metadata and vectors update completed in {Elapsed}. Average speed: {Speed:F2} photos/s", 
+                sw.Elapsed, allIdsToUpdate.Count / sw.Elapsed.TotalSeconds);
         }
 
         // 更新相册统计
