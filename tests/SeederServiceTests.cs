@@ -61,10 +61,11 @@ public class SeederServiceTests
         var vectorStorageMock = new Mock<VectorStorageService>(scopeFactoryMock.Object, new Mock<ILogger<VectorStorageService>>().Object);
 
         serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
+        serviceProviderMock.Setup(x => x.GetService(typeof(VectorStorageService))).Returns(vectorStorageMock.Object);
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool, vectorStorageMock.Object);
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -109,10 +110,11 @@ public class SeederServiceTests
         var vectorStorageMock = new Mock<VectorStorageService>(scopeFactoryMock.Object, new Mock<ILogger<VectorStorageService>>().Object);
 
         serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
+        serviceProviderMock.Setup(x => x.GetService(typeof(VectorStorageService))).Returns(vectorStorageMock.Object);
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool, vectorStorageMock.Object);
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -155,10 +157,11 @@ public class SeederServiceTests
         var vectorStorageMock = new Mock<VectorStorageService>(scopeFactoryMock.Object, new Mock<ILogger<VectorStorageService>>().Object);
 
         serviceProviderMock.Setup(x => x.GetService(typeof(AppDbContext))).Returns(_context);
+        serviceProviderMock.Setup(x => x.GetService(typeof(VectorStorageService))).Returns(vectorStorageMock.Object);
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool, vectorStorageMock.Object);
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();

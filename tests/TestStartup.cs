@@ -27,6 +27,7 @@ public class TestStartup : IWebStartup
         services.AddScoped<SeederService>();
 
         // Controllers and localization
+        services.AddSingleton<VectorStorageService>();
         services.AddControllersWithViews()
             .AddNewtonsoftJson(options =>
             {

@@ -10,7 +10,7 @@ public class VectorStorageService(IServiceScopeFactory scopeFactory, ILogger<Vec
     // Use ConcurrentDictionary for thread-safe updates, though search iterates values.
     // Key: PhotoId, Value: Normalized Float Vector
     private readonly ConcurrentDictionary<int, float[]> _vectorIndex = new();
-    private bool _initialized = false;
+    private bool _initialized;
 
     public int Count => _vectorIndex.Count;
 
