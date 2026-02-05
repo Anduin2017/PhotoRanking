@@ -166,6 +166,35 @@
     padding-top: 1rem;
 }
 
+/* Global Stats */
+.global-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.global-stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.global-stat-title {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.global-stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
 /* Media Queries */
 @media (max-width: 768px) {
     .photo-grid {

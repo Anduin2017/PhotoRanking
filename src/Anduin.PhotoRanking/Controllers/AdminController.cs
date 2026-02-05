@@ -1,5 +1,8 @@
+using Anduin.PhotoRanking.Data;
+using Anduin.PhotoRanking.Models;
 using Anduin.PhotoRanking.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Anduin.PhotoRanking.Controllers;
 
@@ -8,14 +11,61 @@ namespace Anduin.PhotoRanking.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly SeederService _seederService;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<AdminController> _logger;
     
-    public AdminController(SeederService seederService, ILogger<AdminController> logger)
+    public AdminController(SeederService seederService, AppDbContext dbContext, ILogger<AdminController> logger)
     {
         _seederService = seederService;
+        _dbContext = dbContext;
         _logger = logger;
     }
     
+    /// <summary>
+    /// 获取全局统计信息
+    /// </summary>
+    [HttpGet("global-stats")]
+    public async Task<ActionResult<GlobalStats>> GetGlobalStats()
+    {
+        var waitingCount = await _dbContext.Photos.CountAsync(p => p.IndependentScore == null);
+        var photoScores = await _dbContext.Photos
+            .Where(p => p.IndependentScore != null)
+            .Select(p => p.IndependentScore!.Value)
+            .ToListAsync();
+
+        var albumStats = await _dbContext.Albums
+            .Select(a => new { a.KnownRate })
+            .ToListAsync();
+
+        var totalPhotos = waitingCount + photoScores.Count;
+        var totalAlbums = albumStats.Count;
+
+        var stats = new GlobalStats
+        {
+            WaitingCount = waitingCount,
+            RatedCount = photoScores.Count,
+            FullyUnknownAlbumCount = albumStats.Count(a => a.KnownRate < 0.001),
+            FullyKnownAlbumCount = albumStats.Count(a => a.KnownRate > 0.999),
+            AveragePhotosPerAlbum = totalAlbums > 0 ? (double)totalPhotos / totalAlbums : 0,
+            AverageAlbumKnownRate = totalAlbums > 0 ? albumStats.Average(a => a.KnownRate) : 0,
+            OverallAverageScore = photoScores.Any() ? photoScores.Average() : 0,
+            ScoreDistribution = new Dictionary<int, int>()
+        };
+
+        // Initialize 0-5 keys
+        for (int i = 0; i <= 5; i++) stats.ScoreDistribution[i] = 0;
+
+        foreach (var score in photoScores)
+        {
+            var rounded = (int)Math.Round(score);
+            if (rounded < 0) rounded = 0;
+            if (rounded > 5) rounded = 5;
+            stats.ScoreDistribution[rounded]++;
+        }
+
+        return Ok(stats);
+    }
+
     /// <summary>
     /// 手动触发数据同步（扫描目录）
     /// </summary>
