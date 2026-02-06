@@ -15,7 +15,7 @@ public class ImageAnalysisService
         try 
         {
             var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "clip-visual.onnx");
-            var options = new SessionOptions(); 
+            var options = new Microsoft.ML.OnnxRuntime.SessionOptions(); 
             // Optional: Explicitly set execution provider if needed, but CPU is default.
             return new InferenceSession(modelPath, options);
         }
