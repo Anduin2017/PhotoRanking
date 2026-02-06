@@ -62,8 +62,10 @@
             </div>
 
             <div class="viewer-rating">
-                <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
-                    {{ score }}
+                <button class="rating-btn" (click)="guessScore($event)" [disabled]="isGuessing" title="猜测独立分" style="min-width: 48px; width: auto; padding: 0 4px; position: relative; overflow: hidden;">
+                    <span *ngIf="!isGuessing && guessedScore === null">?</span>
+                    <span *ngIf="isGuessing">...</span>
+                    <span *ngIf="!isGuessing && guessedScore !== null" style="font-size: 0.85rem; font-weight: bold;">{{ guessedScore | number:'1.2-2' }}</span>
                 </button>
 
                 <div style="width: 1px; height: 40px; background: var(--border); margin: 0 0.5rem;"></div>
