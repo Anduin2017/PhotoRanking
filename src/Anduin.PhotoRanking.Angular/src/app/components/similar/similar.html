@@ -20,6 +20,10 @@
     <div *ngIf="!isLoading && photos.length === 0" style="text-align: center; color: var(--text-secondary); padding: 50px;">
         No similar photos found.
     </div>
+
+    <div *ngIf="isLoadingMore" class="loading-indicator">
+        <div class="loading-spinner"></div>
+    </div>
 </div>
 
 <div *ngIf="isLoading" class="loading-indicator">

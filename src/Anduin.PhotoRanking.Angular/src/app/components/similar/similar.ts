@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { Photo, PhotoService } from '../../services/photo';
@@ -15,6 +15,10 @@ export class SimilarComponent implements OnInit {
   targetId: number = 0;
   photos: Photo[] = [];
   isLoading = true;
+  isLoadingMore = false;
+  hasMore = true;
+  skip = 0;
+  readonly take = 20;
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -25,23 +29,46 @@ export class SimilarComponent implements OnInit {
     this.route.params.subscribe(params => {
       this.targetId = +params['id'];
       if (this.targetId) {
-        this.loadSimilar(this.targetId);
+        this.resetAndLoad();
       }
     });
   }
 
-  loadSimilar(id: number) {
+  resetAndLoad() {
+    this.photos = [];
+    this.skip = 0;
+    this.hasMore = true;
     this.isLoading = true;
-    this.photoService.getSimilarPhotos(id).subscribe({
-      next: (photos) => {
-        this.photos = photos;
+    this.loadMore();
+  }
+
+  loadMore() {
+    if (this.isLoadingMore || !this.hasMore) return;
+
+    this.isLoadingMore = true;
+    this.photoService.getSimilarPhotos(this.targetId, this.skip, this.take).subscribe({
+      next: (newPhotos) => {
+        if (newPhotos.length < this.take) {
+          this.hasMore = false;
+        }
+        this.photos = [...this.photos, ...newPhotos];
+        this.skip += newPhotos.length;
         this.isLoading = false;
+        this.isLoadingMore = false;
       },
       error: (err) => {
         console.error('Error loading similar photos', err);
         this.isLoading = false;
+        this.isLoadingMore = false;
       }
     });
+  }
+
+  @HostListener('window:scroll', [])
+  onScroll(): void {
+    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+      this.loadMore();
+    }
   }
 
   openViewer(photoId: number) {
