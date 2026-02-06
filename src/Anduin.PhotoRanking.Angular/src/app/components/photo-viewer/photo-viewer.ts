@@ -25,6 +25,8 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
   showInfo = true;
+  guessedScore: number | null = null;
+  isGuessing = false;
 
   // Slideshow
   isPlaying = false;
@@ -118,11 +120,29 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   updateOverlay(photoId: number) {
     if (!photoId) return;
 
+    this.guessedScore = null;
     this.photoService.getPhoto(photoId).subscribe(photo => {
       this.currentPhoto = photo;
     });
 
     this.photoService.viewPhoto(photoId).subscribe();
+  }
+
+  guessScore(event?: Event) {
+    if (event) event.stopPropagation();
+    if (!this.currentPhoto || this.isGuessing) return;
+
+    this.isGuessing = true;
+    this.photoService.guessScore(this.currentPhoto.id).subscribe({
+      next: (score) => {
+        this.guessedScore = score;
+        this.isGuessing = false;
+      },
+      error: (err) => {
+        console.error(err);
+        this.isGuessing = false;
+      }
+    });
   }
 
   onClose() {
