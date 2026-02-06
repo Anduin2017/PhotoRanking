@@ -67,5 +67,12 @@ public class Startup : IWebStartup
         app.UseAuthorization();
         app.MapDefaultControllerRoute();
         app.MapFallbackToFile(Directory.Exists(distPath) ? "dist/index.html" : "index.html");
+        
+        // Validation: Ensure ONNX model exists
+        var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "clip-visual.onnx");
+        if (!File.Exists(modelPath))
+        {
+            throw new FileNotFoundException($"ONNX Model not found at {modelPath}. Please run export_onnx.py script.", modelPath);
+        }
     }
 }
