@@ -95,4 +95,24 @@ public class ImageAnalysisService
         Buffer.BlockCopy(byteArray, 0, floatArray, 0, byteArray.Length);
         return floatArray;
     }
+
+    public static double CalculateCosineSimilarity(float[] vectorA, float[] vectorB)
+    {
+        if (vectorA.Length != vectorB.Length) return 0;
+
+        double dotProduct = 0;
+        double normA = 0;
+        double normB = 0;
+
+        for (int i = 0; i < vectorA.Length; i++)
+        {
+            dotProduct += vectorA[i] * vectorB[i];
+            normA += vectorA[i] * vectorA[i];
+            normB += vectorB[i] * vectorB[i];
+        }
+
+        if (normA == 0 || normB == 0) return 0;
+
+        return dotProduct / (Math.Sqrt(normA) * Math.Sqrt(normB));
+    }
 }

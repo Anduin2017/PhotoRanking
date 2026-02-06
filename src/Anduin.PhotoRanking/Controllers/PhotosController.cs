@@ -298,19 +298,91 @@ public class PhotosController : ControllerBase
             return NotFound("Target photo not found.");
         }
 
+        var vector = await EnsureFeatureVector(targetPhoto);
+        if (vector == null)
+        {
+            return BadRequest("Could not generate feature vector for this image.");
+        }
+
+        var similarPhotos = await _context.Photos
+            .FromSqlInterpolated($@"
+                SELECT * FROM Photos 
+                WHERE Id != {id} AND FeatureVector IS NOT NULL
+                ORDER BY VectorDistance(FeatureVector, {vector}) ASC
+                LIMIT {take}")
+            .Include(p => p.Album)
+            .ToListAsync();
+
+        return Ok(similarPhotos);
+    }
+
+    /// <summary>
+    /// 根据相似照片猜测独立分
+    /// </summary>
+    [HttpGet("{id}/guess-score")]
+    public async Task<ActionResult<double>> GuessScore(int id)
+    {
+        var targetPhoto = await _context.Photos.FindAsync(id);
+        if (targetPhoto == null)
+        {
+            return NotFound("Target photo not found.");
+        }
+
+        var vector = await EnsureFeatureVector(targetPhoto);
+        if (vector == null)
+        {
+            return BadRequest("Could not ensure feature vector for this photo.");
+        }
+
+        var similarRatedPhotos = await _context.Photos
+            .FromSqlInterpolated($@"
+                SELECT * FROM Photos 
+                WHERE Id != {id} AND FeatureVector IS NOT NULL AND IndependentScore IS NOT NULL
+                ORDER BY VectorDistance(FeatureVector, {vector}) ASC
+                LIMIT 20")
+            .ToListAsync();
+
+        if (similarRatedPhotos.Count == 0)
+        {
+            return Ok(0.0);
+        }
+
+        double totalWeightedScore = 0;
+        double totalWeight = 0;
+
+        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vector);
+
+        foreach (var photo in similarRatedPhotos)
+        {
+            var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
+            var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
+
+            // Weight must be positive.
+            var weight = Math.Max(similarity, 0.0001);
+
+            totalWeightedScore += photo.IndependentScore!.Value * weight;
+            totalWeight += weight;
+        }
+
+        var guessedScore = totalWeightedScore / totalWeight;
+        return Ok(Math.Round(guessedScore, 2));
+    }
+
+    private async Task<byte[]?> EnsureFeatureVector(Photo targetPhoto)
+    {
         // Lazy generation if vector is missing
         if (targetPhoto.FeatureVector == null)
         {
             var photoRootPath = _configuration["PhotoRootPath"];
             if (string.IsNullOrEmpty(photoRootPath))
             {
-                return StatusCode(500, "PhotoRootPath not configured.");
+                return null;
             }
 
             var fullPath = Path.Combine(photoRootPath, targetPhoto.FilePath);
             if (!System.IO.File.Exists(fullPath))
             {
-                return NotFound("Photo file not found on disk.");
+                return null;
             }
 
             try
@@ -320,29 +392,18 @@ public class PhotosController : ControllerBase
                 {
                     targetPhoto.FeatureVector = vector;
                     await _context.SaveChangesAsync();
-                }
-                else
-                {
-                    return BadRequest("Failed to generate feature vector for this image.");
+                    return vector;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating vector for photo {Id}", id);
-                return StatusCode(500, "Internal error during vector generation.");
+                _logger.LogError(ex, "Error generating vector for photo {Id}", targetPhoto.Id);
             }
+
+            return null;
         }
 
-        var similarPhotos = await _context.Photos
-            .FromSqlInterpolated($@"
-                SELECT * FROM Photos 
-                WHERE Id != {id} AND FeatureVector IS NOT NULL
-                ORDER BY VectorDistance(FeatureVector, {targetPhoto.FeatureVector}) ASC
-                LIMIT {take}")
-            .Include(p => p.Album)
-            .ToListAsync();
-
-        return Ok(similarPhotos);
+        return targetPhoto.FeatureVector;
     }
 
     /// <summary>
