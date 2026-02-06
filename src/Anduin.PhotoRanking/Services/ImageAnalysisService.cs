@@ -12,8 +12,19 @@ public class ImageAnalysisService
 
 
     private static Lazy<InferenceSession> _session = new(() => {
-        var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "clip-visual.onnx");
-        return new InferenceSession(modelPath);
+        try 
+        {
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "clip-visual.onnx");
+            var options = new SessionOptions(); 
+            // Optional: Explicitly set execution provider if needed, but CPU is default.
+            return new InferenceSession(modelPath, options);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"CRITICAL ERROR initializing OnnxRuntime: {e}");
+            if (e.InnerException != null) Console.WriteLine($"Inner: {e.InnerException}");
+            throw;
+        }
     });
 
     public byte[]? GenerateVector(string filePath)
