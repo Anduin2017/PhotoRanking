@@ -6,7 +6,7 @@ ARG PROJ_NAME="Anduin.PhotoRanking"
 # ============================
 FROM --platform=linux/amd64 python:3.11-slim AS model-builder
 WORKDIR /src
-RUN pip install torch transformers onnx --no-cache-dir
+RUN pip install torch transformers onnx onnxscript --no-cache-dir
 COPY scripts/export_onnx.py ./scripts/
 # Create expected directory structure for the script
 RUN mkdir -p src/Anduin.PhotoRanking/models
