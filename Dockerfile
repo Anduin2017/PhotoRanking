@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y curl gnupg && \
 WORKDIR /src
 COPY . .
 # Copy generated model from builder stage
-COPY --from=model-builder /src/src/Anduin.PhotoRanking/models/clip-visual.onnx ${CSPROJ_PATH}models/clip-visual.onnx
+COPY --from=model-builder /src/src/Anduin.PhotoRanking/models/ ${CSPROJ_PATH}models/
 
 # Build
 RUN dotnet publish ${CSPROJ_PATH}${PROJ_NAME}.csproj  --configuration Release --no-self-contained --runtime linux-x64 --output /app
