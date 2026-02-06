@@ -127,6 +127,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   onClose() {
     this.stopSlideshow();
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(err => console.error(err));
+    }
     this.close.emit();
   }
 
@@ -143,6 +146,11 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   startSlideshow() {
     this.isPlaying = true;
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    }
     this.timer = setInterval(() => {
       if (this.swiper) {
         if (this.swiper.isEnd) {
