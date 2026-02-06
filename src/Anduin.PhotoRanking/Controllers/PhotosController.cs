@@ -290,7 +290,7 @@ public class PhotosController : ControllerBase
     /// 获取与指定照片相似的照片
     /// </summary>
     [HttpGet("{id}/similar")]
-    public async Task<ActionResult<List<Photo>>> GetSimilar(int id, [FromQuery] int take = 10)
+    public async Task<ActionResult<List<Photo>>> GetSimilar(int id, [FromQuery] int skip = 0, [FromQuery] int take = 10)
     {
         var targetPhoto = await _context.Photos.FindAsync(id);
         if (targetPhoto == null)
@@ -309,7 +309,7 @@ public class PhotosController : ControllerBase
                 SELECT * FROM Photos 
                 WHERE Id != {id} AND FeatureVector IS NOT NULL
                 ORDER BY VectorDistance(FeatureVector, {vector}) ASC
-                LIMIT {take}")
+                LIMIT {take} OFFSET {skip}")
             .Include(p => p.Album)
             .ToListAsync();
 

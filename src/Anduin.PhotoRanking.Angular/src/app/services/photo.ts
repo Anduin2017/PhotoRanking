@@ -107,8 +107,8 @@ export class PhotoService {
     return this.http.get<any[]>(`${this.apiBase}/${endpoint}`);
   }
 
-  getSimilarPhotos(id: number, take: number = 20): Observable<Photo[]> {
-    return this.http.get<Photo[]>(`${this.apiBase}/photos/${id}/similar?take=${take}`);
+  getSimilarPhotos(id: number, skip: number = 0, take: number = 20): Observable<Photo[]> {
+    return this.http.get<Photo[]>(`${this.apiBase}/photos/${id}/similar?skip=${skip}&take=${take}`);
   }
 
   guessScore(id: number): Observable<number> {
