@@ -25,7 +25,6 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
   showInfo = true;
-  isLoading = false;
   guessedScore: number | null = null;
   isGuessing = false;
 
@@ -121,22 +120,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   updateOverlay(photoId: number) {
     if (!photoId) return;
 
-    if (this.currentPhoto?.id !== photoId) {
-      this.currentPhoto = null;
-    }
     this.guessedScore = null;
-    this.isLoading = true;
-    this.photoService.getPhoto(photoId).subscribe({
-      next: (photo) => {
-        this.currentPhoto = photo;
-        this.isLoading = false;
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        console.error(err);
-        this.isLoading = false;
-        this.cdr.detectChanges();
-      }
+    this.photoService.getPhoto(photoId).subscribe(photo => {
+      this.currentPhoto = photo;
     });
 
     this.photoService.viewPhoto(photoId).subscribe();
@@ -234,7 +220,6 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
     if (!this.currentPhoto) return;
 
-    this.isLoading = true;
     this.photoService.ratePhoto(this.currentPhoto.id, score).subscribe({
       next: (updatedPhoto) => {
         // Preserve album if missing
@@ -243,19 +228,13 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         }
 
         this.currentPhoto = updatedPhoto;
-        this.isLoading = false;
         // Optionally update the photo in the list if reference is shared or find it by ID
         const index = this.photos.findIndex(p => p.id === updatedPhoto.id);
         if (index !== -1) {
           this.photos[index] = { ...this.photos[index], ...updatedPhoto };
         }
-        this.cdr.detectChanges();
       },
-      error: (err) => {
-        console.error(err);
-        this.isLoading = false;
-        this.cdr.detectChanges();
-      }
+      error: (err) => console.error(err)
     });
   }
 
