@@ -15,7 +15,6 @@ public class PhotosController : ControllerBase
     private readonly ScoringService _scoringService;
     private readonly ILogger<PhotosController> _logger;
     private readonly ImageAnalysisService _imageAnalysis;
-    private readonly IConfiguration _configuration;
     private readonly CanonPool _canonPool;
 
     public PhotosController(
@@ -23,14 +22,12 @@ public class PhotosController : ControllerBase
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
         ImageAnalysisService imageAnalysis,
-        IConfiguration configuration,
         CanonPool canonPool)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
         _imageAnalysis = imageAnalysis;
-        _configuration = configuration;
         _canonPool = canonPool;
     }
 

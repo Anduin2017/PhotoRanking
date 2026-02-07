@@ -362,7 +362,7 @@ public class ScoringService
             }
 
             var fullPath = Path.Combine(photoRootPath, targetPhoto.FilePath);
-            if (!System.IO.File.Exists(fullPath))
+            if (!File.Exists(fullPath))
             {
                 return null;
             }
