@@ -148,8 +148,11 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
     this.isGuessing = true;
     this.photoService.guessScore(this.currentPhoto.id).subscribe({
-      next: (score) => {
-        this.guessedScore = score;
+      next: (result) => {
+        this.guessedScore = result.predictedScore;
+        console.log('🎯 猜测独立分投票结果:', result);
+        console.log('预测分数:', result.predictedScore);
+        console.log('投票详情:', result.votes);
         this.isGuessing = false;
       },
       error: (err) => {

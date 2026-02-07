@@ -15,6 +15,11 @@ export interface Album {
   updatedAt: string;
 }
 
+export interface GuessScoreResult {
+  predictedScore: number;
+  votes: { [score: number]: number };
+}
+
 export interface Photo {
   id: number;
   filePath: string;
@@ -111,7 +116,7 @@ export class PhotoService {
     return this.http.get<Photo[]>(`${this.apiBase}/photos/${id}/similar?skip=${skip}&take=${take}`);
   }
 
-  guessScore(id: number): Observable<number> {
-    return this.http.get<number>(`${this.apiBase}/photos/${id}/guess-score`);
+  guessScore(id: number): Observable<GuessScoreResult> {
+    return this.http.get<GuessScoreResult>(`${this.apiBase}/photos/${id}/guess-score`);
   }
 }

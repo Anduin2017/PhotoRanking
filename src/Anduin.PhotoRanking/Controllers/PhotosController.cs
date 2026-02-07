@@ -317,10 +317,10 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 根据相似照片猜测独立分
+    /// 根据相似照片猜测独立分（使用KNN投票法）
     /// </summary>
     [HttpGet("{id}/guess-score")]
-    public async Task<ActionResult<double>> GuessScore(int id)
+    public async Task<ActionResult<object>> GuessScore(int id)
     {
         var targetPhoto = await _context.Photos.FindAsync(id);
         if (targetPhoto == null)
@@ -334,38 +334,55 @@ public class PhotosController : ControllerBase
             return BadRequest("Could not ensure feature vector for this photo.");
         }
 
+        // 取Top 100相似照片
         var similarRatedPhotos = await _context.Photos
             .FromSqlInterpolated($@"
                 SELECT * FROM Photos 
                 WHERE Id != {id} AND FeatureVector IS NOT NULL AND IndependentScore IS NOT NULL
                 ORDER BY VectorDistance(FeatureVector, {vector}) ASC
-                LIMIT 20")
+                LIMIT 100")
             .ToListAsync();
 
         if (similarRatedPhotos.Count == 0)
         {
-            return Ok(0.0);
+            return Ok(new { predictedScore = 0, votes = new Dictionary<int, double>() });
         }
 
-        double totalWeightedScore = 0;
-        double totalWeight = 0;
-
         var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vector);
+        
+        // 投票字典：分数 -> 票数
+        var votes = new Dictionary<int, double>();
 
         foreach (var photo in similarRatedPhotos)
         {
             var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
             var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
 
-            // Weight must be positive.
-            var weight = Math.Max(similarity, 0.0001);
+            // 使用指数权重：相似度越高，权重指数级增长
+            // similarity 范围通常在 [0.7, 1.0]，我们将其映射到更大的权重差异
+            // 例如：0.95 -> e^(0.95*10) ≈ e^9.5 ≈ 13359
+            //      0.85 -> e^(0.85*10) ≈ e^8.5 ≈ 4914
+            //      0.75 -> e^(0.75*10) ≈ e^7.5 ≈ 1808
+            // 这样高相似度的照片权重会远大于低相似度的照片
+            var weight = Math.Exp(similarity * 10);
 
-            totalWeightedScore += photo.IndependentScore!.Value * weight;
-            totalWeight += weight;
+            var score = (int)Math.Round(photo.IndependentScore!.Value);
+            
+            if (!votes.ContainsKey(score))
+            {
+                votes[score] = 0;
+            }
+            votes[score] += weight;
         }
 
-        var guessedScore = totalWeightedScore / totalWeight;
-        return Ok(Math.Round(guessedScore, 2));
+        // 找出票数最多的分数
+        var winningScore = votes.OrderByDescending(kv => kv.Value).First().Key;
+
+        return Ok(new
+        {
+            predictedScore = winningScore,
+            votes = votes.OrderByDescending(kv => kv.Value).ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value, 2))
+        });
     }
 
     private async Task<byte[]?> EnsureFeatureVector(Photo targetPhoto)
