@@ -43,7 +43,7 @@ export class SimilarComponent implements OnInit {
   }
 
   loadMore() {
-    if (this.isLoadingMore || !this.hasMore) return;
+    if (this.isLoadingMore || !this.hasMore || !this.targetId) return;
 
     this.isLoadingMore = true;
     this.photoService.getSimilarPhotos(this.targetId, this.skip, this.take).subscribe({
