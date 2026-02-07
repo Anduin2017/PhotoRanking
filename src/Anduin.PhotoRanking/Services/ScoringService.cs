@@ -7,10 +7,37 @@ namespace Anduin.PhotoRanking.Services;
 public class ScoringService
 {
     private readonly AppDbContext _context;
+    private readonly ImageAnalysisService _imageAnalysis;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<ScoringService> _logger;
 
-    public ScoringService(AppDbContext context)
+    public ScoringService(
+        AppDbContext context,
+        ImageAnalysisService imageAnalysis,
+        IConfiguration configuration,
+        ILogger<ScoringService> logger)
     {
         _context = context;
+        _imageAnalysis = imageAnalysis;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// 应用 SmoothStep 算法（Hermite 插值）来平滑分数
+    /// 公式：t = x/5, y = 5 * (t^2 * (3 - 2t))
+    /// 例如：4.0 -> 4.48 (接近 4.5)
+    /// </summary>
+    private double ApplySmoothStep(double score)
+    {
+        // 将分数归一化到 [0, 1] 区间
+        double t = score / 5.0;
+        
+        // Hermite 插值公式：t^2 * (3 - 2t)
+        double smoothed = t * t * (3.0 - 2.0 * t);
+        
+        // 还原到 [0, 5] 区间
+        return smoothed * 5.0;
     }
 
     /// <summary>
@@ -214,5 +241,150 @@ public class ScoringService
         }
 
         return items.Last();
+    }
+
+    /// <summary>
+    /// 猜测单张照片的分数（使用分层KNN平衡算法 + SmoothStep 平滑）
+    /// </summary>
+    public async Task<int> GuessScoreInternal(Photo targetPhoto)
+    {
+        var vector = await EnsureFeatureVectorPublic(targetPhoto);
+        if (vector == null)
+        {
+            return 0;
+        }
+
+        var result = await GuessScoreBalancedInternal(targetPhoto, vector);
+        return (int)Math.Round(result.PredictedScore);
+    }
+
+    /// <summary>
+    /// 使用分层KNN平衡算法猜测照片分数，并应用 SmoothStep 平滑
+    /// </summary>
+    public async Task<(double PredictedScore, Dictionary<int, double> Votes)> GuessScoreBalancedInternal(Photo targetPhoto, byte[] targetVectorBytes)
+    {
+        // 1. 使用 Window Function 分层获取每个分数段的前20名相似照片
+        // 这样可以避免高分照片数量过多导致的样本偏差
+        var similarRatedPhotos = await _context.Photos
+            .FromSqlInterpolated($@"
+                WITH Ranked AS (
+                    SELECT 
+                        Id,
+                        IndependentScore,
+                        VectorDistance(FeatureVector, {targetVectorBytes}) as Distance,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY CAST(ROUND(IndependentScore) AS INTEGER) 
+                            ORDER BY VectorDistance(FeatureVector, {targetVectorBytes}) ASC
+                        ) as Rank
+                    FROM Photos
+                    WHERE Id != {targetPhoto.Id} 
+                      AND FeatureVector IS NOT NULL 
+                      AND IndependentScore IS NOT NULL
+                )
+                SELECT p.* 
+                FROM Photos p
+                INNER JOIN Ranked r ON p.Id = r.Id
+                WHERE r.Rank <= 20")
+            .AsNoTracking()
+            .ToListAsync();
+
+        if (similarRatedPhotos.Count == 0)
+        {
+            return (0, new Dictionary<int, double>());
+        }
+
+        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetVectorBytes);
+        
+        // 2. 按分数分组计算相关性均值
+        var scoreGroups = similarRatedPhotos
+            .GroupBy(p => (int)Math.Round(p.IndependentScore!.Value))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var scoreConfidences = new Dictionary<int, double>();
+
+        // 遍历可能的 0-5 分
+        for (int i = 0; i <= 5; i++)
+        {
+            if (!scoreGroups.ContainsKey(i))
+            {
+                scoreConfidences[i] = 0;
+                continue;
+            }
+
+            var photosInGroup = scoreGroups[i];
+
+            // 【核心优化】：不要算平均值！
+            // 如果我是烂片，我可能只跟库里某一张烂片特别像，跟其他烂片不像。
+            // 所以取 Top 3 的均值，代表这个分数段的"最佳匹配能力"。
+            var similarities = new List<double>();
+            foreach (var photo in photosInGroup)
+            {
+                var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
+                var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
+                similarities.Add(Math.Max(0, similarity));
+            }
+            
+            // 取最像的前3个的平均相似度
+            var bestMatchSimilarity = similarities.OrderByDescending(x => x).Take(3).Average();
+
+            // 非线性放大：0.8 和 0.85 的差距要变成 1 和 10 的差距
+            scoreConfidences[i] = Math.Pow(bestMatchSimilarity, 30);
+        }
+
+        // 3. 加权平均算出原始预测分
+        double totalWeight = scoreConfidences.Values.Sum();
+        if (totalWeight == 0) return (0, scoreConfidences);
+
+        double weightedSum = scoreConfidences.Sum(x => x.Key * x.Value);
+        var rawPredictedScore = weightedSum / totalWeight;
+        
+        // 4. 【新增】应用 SmoothStep 算法平滑分数
+        var smoothedScore = ApplySmoothStep(rawPredictedScore);
+        
+        // 归一化输出用于前端显示
+        var displayVotes = scoreConfidences.ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value / totalWeight * 100, 2));
+
+        return (smoothedScore, displayVotes);
+    }
+
+    /// <summary>
+    /// 确保照片有特征向量，如果没有则生成（公共方法）
+    /// </summary>
+    public async Task<byte[]?> EnsureFeatureVectorPublic(Photo targetPhoto)
+    {
+        // Lazy generation if vector is missing
+        if (targetPhoto.FeatureVector == null)
+        {
+            var photoRootPath = _configuration["PhotoRootPath"];
+            if (string.IsNullOrEmpty(photoRootPath))
+            {
+                return null;
+            }
+
+            var fullPath = Path.Combine(photoRootPath, targetPhoto.FilePath);
+            if (!System.IO.File.Exists(fullPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                var vector = _imageAnalysis.GenerateVector(fullPath);
+                if (vector != null)
+                {
+                    targetPhoto.FeatureVector = vector;
+                    await _context.SaveChangesAsync();
+                    return vector;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating vector for photo {Id}", targetPhoto.Id);
+            }
+
+            return null;
+        }
+
+        return targetPhoto.FeatureVector;
     }
 }

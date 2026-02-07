@@ -63,7 +63,7 @@ public class PhotosController : ControllerBase
         {
             _canonPool.RegisterNewTaskToPool(async () =>
             {
-                var predictedScore = await GuessScoreInternal(photo);
+                var predictedScore = await _scoringService.GuessScoreInternal(photo);
                 lock (lockObject)
                 {
                     photoScoreResults.Add((photo, predictedScore));
@@ -297,7 +297,7 @@ public class PhotosController : ControllerBase
             return NotFound("Target photo not found.");
         }
 
-        var vector = await EnsureFeatureVector(targetPhoto);
+        var vector = await _scoringService.EnsureFeatureVectorPublic(targetPhoto);
         if (vector == null)
         {
             return BadRequest("Could not generate feature vector for this image.");
@@ -327,13 +327,13 @@ public class PhotosController : ControllerBase
             return NotFound("Target photo not found.");
         }
 
-        var vector = await EnsureFeatureVector(targetPhoto);
+        var vector = await _scoringService.EnsureFeatureVectorPublic(targetPhoto);
         if (vector == null)
         {
             return BadRequest("Could not ensure feature vector for this photo.");
         }
 
-        var result = await GuessScoreBalancedInternal(targetPhoto, vector);
+        var result = await _scoringService.GuessScoreBalancedInternal(targetPhoto, vector);
 
         return Ok(new
         {
@@ -342,149 +342,7 @@ public class PhotosController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// 内部方法：猜测单张照片的分数（使用分层KNN平衡算法）
-    /// </summary>
-    private async Task<int> GuessScoreInternal(Photo targetPhoto)
-    {
-        var vector = await EnsureFeatureVector(targetPhoto);
-        if (vector == null)
-        {
-            return 0;
-        }
 
-        var result = await GuessScoreBalancedInternal(targetPhoto, vector);
-        return (int)Math.Round(result.PredictedScore);
-    }
-
-    private async Task<(double PredictedScore, Dictionary<int, double> Votes)> GuessScoreBalancedInternal(Photo targetPhoto, byte[] targetVectorBytes)
-    {
-        // 1. 使用 Window Function 分层获取每个分数段的前20名相似照片
-        // 这样可以避免高分照片数量过多导致的样本偏差
-        // Added AsNoTracking to avoid tracking overhead and potential navigation property issues
-        var similarRatedPhotos = await _context.Photos
-            .FromSqlInterpolated($@"
-                WITH Ranked AS (
-                    SELECT 
-                        Id,
-                        -- IndependentScore is needed for partitioning
-                        IndependentScore,
-                        -- Distance is needed for ordering
-                        VectorDistance(FeatureVector, {targetVectorBytes}) as Distance,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY CAST(ROUND(IndependentScore) AS INTEGER) 
-                            ORDER BY VectorDistance(FeatureVector, {targetVectorBytes}) ASC
-                        ) as Rank
-                    FROM Photos
-                    WHERE Id != {targetPhoto.Id} 
-                      AND FeatureVector IS NOT NULL 
-                      AND IndependentScore IS NOT NULL
-                )
-                SELECT p.* 
-                FROM Photos p
-                INNER JOIN Ranked r ON p.Id = r.Id
-                WHERE r.Rank <= 20")
-            .AsNoTracking()
-            .ToListAsync();
-
-        if (similarRatedPhotos.Count == 0)
-        {
-            return (0, new Dictionary<int, double>());
-        }
-
-        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetVectorBytes);
-        
-        // 2. 按分数分组计算相关性均值
-        // Group by rounded score (0-5)
-        var scoreGroups = similarRatedPhotos
-            .GroupBy(p => (int)Math.Round(p.IndependentScore!.Value))
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var scoreConfidences = new Dictionary<int, double>();
-
-        // 遍历可能的 0-5 分
-        for (int i = 0; i <= 5; i++)
-        {
-            if (!scoreGroups.ContainsKey(i))
-            {
-                scoreConfidences[i] = 0;
-                continue;
-            }
-
-            var photosInGroup = scoreGroups[i];
-
-            // 【核心优化】：不要算平均值！
-            // 如果我是烂片，我可能只跟库里某一张烂片特别像，跟其他烂片不像。
-            // 所以取 Top 3 的均值，代表这个分数段的"最佳匹配能力"。
-            var similarities = new List<double>();
-            foreach (var photo in photosInGroup)
-            {
-                var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
-                var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
-                similarities.Add(Math.Max(0, similarity));
-            }
-            
-            // 取最像的前3个的平均相似度
-            var bestMatchSimilarity = similarities.OrderByDescending(x => x).Take(3).Average();
-
-            // 4. 【关键】：非线性放大
-            // 0.8 和 0.85 的差距要变成 1 和 10 的差距
-            // 使用指数放大，Base 可以是 30 或者更高
-            // 这种算法下，那个拥有"最像的那张图"的分数段，得分会飙升
-            scoreConfidences[i] = Math.Pow(bestMatchSimilarity, 30);
-        }
-
-        // 5. 加权平均算出最终分
-        double totalWeight = scoreConfidences.Values.Sum();
-        if (totalWeight == 0) return (0, scoreConfidences);
-
-        double weightedSum = scoreConfidences.Sum(x => x.Key * x.Value);
-        var predictedScore = weightedSum / totalWeight;
-        
-        // 归一化输出用于前端显示（可选，这里保留原始计算值更直观）
-        // 为了前端展示方便，我们把置信度归一化到 0-100
-        var displayVotes = scoreConfidences.ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value / totalWeight * 100, 2));
-
-        return (predictedScore, displayVotes);
-    }
-
-    private async Task<byte[]?> EnsureFeatureVector(Photo targetPhoto)
-    {
-        // Lazy generation if vector is missing
-        if (targetPhoto.FeatureVector == null)
-        {
-            var photoRootPath = _configuration["PhotoRootPath"];
-            if (string.IsNullOrEmpty(photoRootPath))
-            {
-                return null;
-            }
-
-            var fullPath = Path.Combine(photoRootPath, targetPhoto.FilePath);
-            if (!System.IO.File.Exists(fullPath))
-            {
-                return null;
-            }
-
-            try
-            {
-                var vector = _imageAnalysis.GenerateVector(fullPath);
-                if (vector != null)
-                {
-                    targetPhoto.FeatureVector = vector;
-                    await _context.SaveChangesAsync();
-                    return vector;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating vector for photo {Id}", targetPhoto.Id);
-            }
-
-            return null;
-        }
-
-        return targetPhoto.FeatureVector;
-    }
 
     /// <summary>
     /// 上传图片搜索相似内容
