@@ -316,7 +316,7 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 根据相似照片猜测独立分（使用KNN投票法）
+    /// 根据相似照片猜测独立分（使用分层KNN平衡算法）
     /// </summary>
     [HttpGet("{id}/guess-score")]
     public async Task<ActionResult<object>> GuessScore(int id)
@@ -333,59 +333,17 @@ public class PhotosController : ControllerBase
             return BadRequest("Could not ensure feature vector for this photo.");
         }
 
-        // 取Top 100相似照片
-        var similarRatedPhotos = await _context.Photos
-            .FromSqlInterpolated($@"
-                SELECT * FROM Photos 
-                WHERE Id != {id} AND FeatureVector IS NOT NULL AND IndependentScore IS NOT NULL
-                ORDER BY VectorDistance(FeatureVector, {vector}) ASC
-                LIMIT 100")
-            .ToListAsync();
-
-        if (similarRatedPhotos.Count == 0)
-        {
-            return Ok(new { predictedScore = 0, votes = new Dictionary<int, double>() });
-        }
-
-        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vector);
-        
-        // 投票字典：分数 -> 票数
-        var votes = new Dictionary<int, double>();
-
-        foreach (var photo in similarRatedPhotos)
-        {
-            var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
-            var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
-
-            // 使用指数权重：相似度越高，权重指数级增长
-            // similarity 范围通常在 [0.7, 1.0]，我们将其映射到更大的权重差异
-            // 例如：0.95 -> e^(0.95*10) ≈ e^9.5 ≈ 13359
-            //      0.85 -> e^(0.85*10) ≈ e^8.5 ≈ 4914
-            //      0.75 -> e^(0.75*10) ≈ e^7.5 ≈ 1808
-            // 这样高相似度的照片权重会远大于低相似度的照片
-            var weight = Math.Exp(similarity * 10);
-
-            var score = (int)Math.Round(photo.IndependentScore!.Value);
-            
-            if (!votes.ContainsKey(score))
-            {
-                votes[score] = 0;
-            }
-            votes[score] += weight;
-        }
-
-        // 找出票数最多的分数
-        var winningScore = votes.OrderByDescending(kv => kv.Value).First().Key;
+        var result = await GuessScoreBalancedInternal(targetPhoto, vector);
 
         return Ok(new
         {
-            predictedScore = winningScore,
-            votes = votes.OrderByDescending(kv => kv.Value).ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value, 2))
+            predictedScore = result.PredictedScore,
+            votes = result.Votes
         });
     }
 
     /// <summary>
-    /// 内部方法：猜测单张照片的分数（不返回投票详情）
+    /// 内部方法：猜测单张照片的分数（使用分层KNN平衡算法）
     /// </summary>
     private async Task<int> GuessScoreInternal(Photo targetPhoto)
     {
@@ -395,37 +353,92 @@ public class PhotosController : ControllerBase
             return 0;
         }
 
+        var result = await GuessScoreBalancedInternal(targetPhoto, vector);
+        return (int)Math.Round(result.PredictedScore);
+    }
+
+    private async Task<(double PredictedScore, Dictionary<int, double> Votes)> GuessScoreBalancedInternal(Photo targetPhoto, byte[] targetVectorBytes)
+    {
+        // 1. 使用 Window Function 分层获取每个分数段的前20名相似照片
+        // 这样可以避免高分照片数量过多导致的样本偏差
         var similarRatedPhotos = await _context.Photos
             .FromSqlInterpolated($@"
-                SELECT * FROM Photos 
-                WHERE Id != {targetPhoto.Id} AND FeatureVector IS NOT NULL AND IndependentScore IS NOT NULL
-                ORDER BY VectorDistance(FeatureVector, {vector}) ASC
-                LIMIT 100")
+                WITH Ranked AS (
+                    SELECT 
+                        Id,
+                        IndependentScore,
+                        VectorDistance(FeatureVector, {targetVectorBytes}) as Distance,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY CAST(ROUND(IndependentScore) AS INTEGER) 
+                            ORDER BY VectorDistance(FeatureVector, {targetVectorBytes}) ASC
+                        ) as Rank
+                    FROM Photos
+                    WHERE Id != {targetPhoto.Id} 
+                      AND FeatureVector IS NOT NULL 
+                      AND IndependentScore IS NOT NULL
+                )
+                SELECT * FROM Ranked WHERE Rank <= 20")
             .ToListAsync();
 
         if (similarRatedPhotos.Count == 0)
         {
-            return 0;
+            return (0, new Dictionary<int, double>());
         }
 
-        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vector);
-        var votes = new Dictionary<int, double>();
+        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetVectorBytes);
+        
+        // 2. 按分数分组计算相关性均值
+        // Group by rounded score (0-5)
+        var scoreGroups = similarRatedPhotos
+            .GroupBy(p => (int)Math.Round(p.IndependentScore!.Value))
+            .ToDictionary(g => g.Key, g => g.ToList());
 
-        foreach (var photo in similarRatedPhotos)
+        var scoreConfidences = new Dictionary<int, double>();
+
+        // 遍历可能的 0-5 分
+        for (int i = 0; i <= 5; i++)
         {
-            var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
-            var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
-            var weight = Math.Exp(similarity * 10);
-            var score = (int)Math.Round(photo.IndependentScore!.Value);
-            
-            if (!votes.ContainsKey(score))
+            if (!scoreGroups.ContainsKey(i))
             {
-                votes[score] = 0;
+                scoreConfidences[i] = 0;
+                continue;
             }
-            votes[score] += weight;
+
+            var photosInGroup = scoreGroups[i];
+
+            // 【核心优化】：不要算平均值！
+            // 如果我是烂片，我可能只跟库里某一张烂片特别像，跟其他烂片不像。
+            // 所以取 Top 3 的均值，代表这个分数段的"最佳匹配能力"。
+            var similarities = new List<double>();
+            foreach (var photo in photosInGroup)
+            {
+                var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
+                var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
+                similarities.Add(Math.Max(0, similarity));
+            }
+            
+            // 取最像的前3个的平均相似度
+            var bestMatchSimilarity = similarities.OrderByDescending(x => x).Take(3).Average();
+
+            // 4. 【关键】：非线性放大
+            // 0.8 和 0.85 的差距要变成 1 和 10 的差距
+            // 使用指数放大，Base 可以是 30 或者更高
+            // 这种算法下，那个拥有"最像的那张图"的分数段，得分会飙升
+            scoreConfidences[i] = Math.Pow(bestMatchSimilarity, 30);
         }
 
-        return votes.OrderByDescending(kv => kv.Value).First().Key;
+        // 5. 加权平均算出最终分
+        double totalWeight = scoreConfidences.Values.Sum();
+        if (totalWeight == 0) return (0, scoreConfidences);
+
+        double weightedSum = scoreConfidences.Sum(x => x.Key * x.Value);
+        var predictedScore = weightedSum / totalWeight;
+        
+        // 归一化输出用于前端显示（可选，这里保留原始计算值更直观）
+        // 为了前端展示方便，我们把置信度归一化到 0-100
+        var displayVotes = scoreConfidences.ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value / totalWeight * 100, 2));
+
+        return (predictedScore, displayVotes);
     }
 
     private async Task<byte[]?> EnsureFeatureVector(Photo targetPhoto)
