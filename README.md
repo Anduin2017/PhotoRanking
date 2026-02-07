@@ -1,39 +1,13 @@
 # PhotoRanking - A sample project
 
-[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/blob/master/LICENSE)
-[![Pipeline stat](https://gitlab.aiursoft.com/anduin/photoRanking/badges/master/pipeline.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/pipelines)
-[![Test Coverage](https://gitlab.aiursoft.com/anduin/photoRanking/badges/master/coverage.svg)](https://gitlab.aiursoft.com/anduin/photoRanking/-/pipelines)
-[![Man hours](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoRanking.svg)](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoRanking.html)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.aiursoft.com/anduin/photoranking/-/blob/master/LICENSE)
+[![Pipeline stat](https://gitlab.aiursoft.com/anduin/photoranking/badges/master/pipeline.svg)](https://gitlab.aiursoft.com/anduin/photoranking/-/pipelines)
+[![Test Coverage](https://gitlab.aiursoft.com/anduin/photoranking/badges/master/coverage.svg)](https://gitlab.aiursoft.com/anduin/photoranking/-/pipelines)
+[![Man hours](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoranking.svg)](https://manhours.aiursoft.com/r/gitlab.aiursoft.com/anduin/photoranking.html)
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Franking.anduinlab.com)](https://ranking.anduinlab.com)
 [![Docker](https://img.shields.io/docker/pulls/anduin2019/photoranking.svg)](https://hub.docker.com/r/anduin2019/photoranking)
 
 PhotoRanking is a simple web application that allows users to upload photos and have others rank them. It is built using ASP.NET Core and Entity Framework Core, with a SQLite database for data storage.
-
-![screenshot](./screenshot.png)
-
-Default user name is `admin@default.com` and default password is `admin123`.
-
-## Try
-
-Try a running PhotoRanking [here](https://photoRanking.aiursoft.com).
-
-## Run in Ubuntu
-
-The following script will install\update this app on your Ubuntu server. Supports Ubuntu 25.04.
-
-On your Ubuntu server, run the following command:
-
-```bash
-curl -sL https://gitlab.aiursoft.com/anduin/photoRanking/-/raw/master/install.sh | sudo bash
-```
-
-Of course it is suggested that append a custom port number to the command:
-
-```bash
-curl -sL https://gitlab.aiursoft.com/anduin/photoRanking/-/raw/master/install.sh | sudo bash -s 8080
-```
-
-It will install the app as a systemd service, and start it automatically. Binary files will be located at `/opt/apps`. Service files will be located at `/etc/systemd/system`.
 
 ## Run manually
 
@@ -56,10 +30,10 @@ First, install Docker [here](https://docs.docker.com/get-docker/).
 Then run the following commands in a Linux shell:
 
 ```bash
-image=anduin/photoRanking
-appName=photoRanking
+image=anduin/photoranking
+appName=photoranking
 sudo docker pull $image
-sudo docker run -d --name $appName --restart unless-stopped -p 5000:5000 -v /var/www/$appName:/data $image
+sudo docker run -d --name $appName --restart unless-stopped -p 5000:5000 -v /var/www/$appName:/data /your-photos:/photos $image
 ```
 
 That will start a web server at `http://localhost:5000` and you can test the app.
@@ -68,7 +42,7 @@ The docker image has the following context:
 
 | Properties  | Value                           |
 |-------------|---------------------------------|
-| Image       | anduin/photoRanking               |
+| Image       | anduin/photoranking             |
 | Ports       | 5000                            |
 | Binary path | /app                            |
 | Data path   | /data                           |
