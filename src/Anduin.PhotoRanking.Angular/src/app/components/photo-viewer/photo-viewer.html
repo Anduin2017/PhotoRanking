@@ -15,79 +15,93 @@
         </svg>
     </button>
 
-    <div class="viewer-info" [class.hidden]="!showInfo" *ngIf="currentPhoto" (click)="$event.stopPropagation()">
-        <div class="viewer-album-info" (click)="openAlbum()" style="cursor: pointer;">
-            <div class="album-info-left">
-                <div class="album-name" *ngIf="currentPhoto.album">
-                    {{ currentPhoto.album.name }}
-                    <span style="font-size: 0.8em; opacity: 0.6; margin-left: 8px; font-weight: normal;">{{ currentPhoto.albumId }}</span>
-                </div>
-                <div class="album-score" *ngIf="currentPhoto.album">
-                    相册分: <span>{{ currentPhoto.album.albumScore | number:'1.2-2' }}</span>
-                </div>
-            </div>
-            <!-- View Album logic could be added here, emitting an event -->
+    <div class="compact-score-badge" [class.hidden]="showInfo" (click)="showInfo = true; $event.stopPropagation()" [class.unrated]="!isLoading && (!currentPhoto || currentPhoto.independentScore == null)">
+        <div class="spinner" *ngIf="isLoading"></div>
+        <ng-container *ngIf="!isLoading">
+            <span *ngIf="currentPhoto && currentPhoto.independentScore != null">{{ currentPhoto.independentScore | number:'1.2-2' }}</span>
+            <span *ngIf="!currentPhoto || currentPhoto.independentScore == null">?</span>
+        </ng-container>
+    </div>
+
+    <div class="viewer-info" [class.hidden]="!showInfo" (click)="$event.stopPropagation()">
+        <div *ngIf="isLoading && !currentPhoto" style="width: 100%; display: flex; justify-content: center; padding: 1rem;">
+            <div class="spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>
         </div>
 
-        <div class="viewer-stats">
-            <div class="stat-badge">
-                <span class="stat-badge-label">综合评分</span>
-                <span class="stat-badge-value">{{ currentPhoto.overallScore | number:'1.2-2' }}</span>
+        <ng-container *ngIf="currentPhoto">
+            <div class="viewer-album-info" (click)="openAlbum()" style="cursor: pointer;">
+                <div class="album-info-left">
+                    <div class="album-name" *ngIf="currentPhoto.album">
+                        {{ currentPhoto.album.name }}
+                        <span style="font-size: 0.8em; opacity: 0.6; margin-left: 8px; font-weight: normal;">{{ currentPhoto.albumId }}</span>
+                    </div>
+                    <div class="album-score" *ngIf="currentPhoto.album">
+                        相册分: <span>{{ currentPhoto.album.albumScore | number:'1.2-2' }}</span>
+                    </div>
+                </div>
+                <!-- View Album logic could be added here, emitting an event -->
             </div>
-            <div class="stat-badge">
-                <span class="stat-badge-label">独立评分</span>
-                <span class="stat-badge-value">{{ currentPhoto.independentScore != null ? (currentPhoto.independentScore | number:'1.2-2') : '-' }}</span>
+
+            <div class="viewer-stats">
+                <div class="stat-badge">
+                    <span class="stat-badge-label">综合评分</span>
+                    <span class="stat-badge-value">{{ currentPhoto.overallScore | number:'1.2-2' }}</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-badge-label">独立评分</span>
+                    <span class="stat-badge-value">{{ currentPhoto.independentScore != null ? (currentPhoto.independentScore | number:'1.2-2') : '-' }}</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-badge-label">已知度</span>
+                    <span class="stat-badge-value">{{ currentPhoto.knownness | number:'1.2-2' }}</span>
+                </div>
+                 <div class="stat-badge">
+                    <span class="stat-badge-label">评分数</span>
+                    <span class="stat-badge-value">{{ currentPhoto.ratingCount }}</span>
+                </div>
             </div>
-            <div class="stat-badge">
-                <span class="stat-badge-label">已知度</span>
-                <span class="stat-badge-value">{{ currentPhoto.knownness | number:'1.2-2' }}</span>
-            </div>
-             <div class="stat-badge">
-                <span class="stat-badge-label">评分数</span>
-                <span class="stat-badge-value">{{ currentPhoto.ratingCount }}</span>
-            </div>
-        </div>
 
-        <div class="viewer-rating">
-            <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
-                {{ score }}
-            </button>
+            <div class="viewer-rating">
+                <button class="rating-btn" (click)="guessScore($event)" [disabled]="isGuessing" title="猜测独立分" style="min-width: 48px; width: auto; padding: 0 4px; position: relative; overflow: hidden;">
+                    <span *ngIf="!isGuessing && guessedScore === null">?</span>
+                    <span *ngIf="isGuessing">...</span>
+                    <span *ngIf="!isGuessing && guessedScore !== null" style="font-size: 0.85rem; font-weight: bold;">{{ guessedScore | number:'1.2-2' }}</span>
+                </button>
 
-            <div style="width: 1px; height: 40px; background: var(--border); margin: 0 0.5rem;"></div>
+                <div style="width: 1px; height: 40px; background: var(--border); margin: 0 0.5rem;"></div>
 
-            <button class="rating-btn" (click)="viewSimilar($event)" title="View Similar Images">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </button>
-
-            <button class="rating-btn" (click)="togglePlay($event)" [class.active]="isPlaying" title="Play/Pause Slideshow">
-                <svg *ngIf="!isPlaying" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
-                    <path d="M8 5v14l11-7z"/>
-                </svg>
-                <svg *ngIf="isPlaying" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
-                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                </svg>
-            </button>
-
-            <div style="position: relative;">
-                <button class="rating-btn" (click)="toggleSettings($event)" [class.active]="showSettings" title="Slideshow Settings">
+                <button class="rating-btn" (click)="viewSimilar($event)" title="View Similar Images">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
-                         <circle cx="12" cy="12" r="10"></circle>
-                         <polyline points="12 6 12 12 16 14"></polyline>
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                 </button>
-                
-                <div class="settings-popup" *ngIf="showSettings" (click)="$event.stopPropagation()">
-                    <div class="settings-row">
-                        <label>间隔(秒)</label>
-                        <input type="number" [(ngModel)]="slideInterval" (change)="updateInterval()" min="0.2" max="900" step="0.5">
+
+                <button class="rating-btn" (click)="togglePlay($event)" [class.active]="isPlaying" title="Play/Pause Slideshow">
+                    <svg *ngIf="!isPlaying" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <svg *ngIf="isPlaying" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                </button>
+
+                <div style="position: relative;">
+                    <button class="rating-btn" (click)="toggleSettings($event)" [class.active]="showSettings" title="Slideshow Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                             <circle cx="12" cy="12" r="10"></circle>
+                             <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </button>
+                    
+                    <div class="settings-popup" *ngIf="showSettings" (click)="$event.stopPropagation()">
+                        <div class="settings-row">
+                            <label>间隔(秒)</label>
+                            <input type="number" [(ngModel)]="slideInterval" (change)="updateInterval()" min="0.2" max="900" step="0.5">
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Rating buttons here if needed, or keeping it separate as in original overlay -->
+        </ng-container>
     </div>
 </div>

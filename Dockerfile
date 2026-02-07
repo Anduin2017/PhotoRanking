@@ -2,7 +2,21 @@ ARG CSPROJ_PATH="./src/Anduin.PhotoRanking/"
 ARG PROJ_NAME="Anduin.PhotoRanking"
 
 # ============================
+# Model Generation Stage
+# ============================
+FROM --platform=linux/amd64 python:3.11-slim AS model-builder
+WORKDIR /src
+RUN pip install torch transformers onnx onnxscript --no-cache-dir
+COPY scripts/export_onnx.py ./scripts/
+# Create expected directory structure for the script
+RUN mkdir -p src/Anduin.PhotoRanking/models
+WORKDIR /src/scripts
+# Script writes to ../src/Anduin.PhotoRanking/models/clip-visual.onnx
+RUN python export_onnx.py
+
+# ============================
 # Prepare Building Environment
+# ============================
 FROM hub.aiursoft.com/aiursoft/internalimages/dotnet AS build-env
 ARG CSPROJ_PATH
 ARG PROJ_NAME
@@ -22,6 +36,8 @@ RUN apt-get update && apt-get install -y curl gnupg && \
     apt-get update && apt-get install -y nodejs
 WORKDIR /src
 COPY . .
+# Copy generated model from builder stage
+COPY --from=model-builder /src/src/Anduin.PhotoRanking/models/ ${CSPROJ_PATH}models/
 
 # Build
 RUN dotnet publish ${CSPROJ_PATH}${PROJ_NAME}.csproj  --configuration Release --no-self-contained --runtime linux-x64 --output /app
@@ -38,6 +54,8 @@ COPY --from=build-env /app .
 RUN sed -i 's/DataSource=app.db/DataSource=\/data\/app.db/g' appsettings.json
 RUN sed -i 's/\/tmp\/data/\/data/g' appsettings.json
 RUN mkdir -p /data
+# Install libgomp1 for OnnxRuntime
+RUN apt-get update && apt-get install -y libgomp1
 
 VOLUME /data
 EXPOSE 5000
@@ -49,14 +67,14 @@ ENV DLL_NAME=${PROJ_NAME}.dll
 #ENTRYPOINT dotnet $DLL_NAME --urls http://*:5000
 ENTRYPOINT ["/bin/bash", "-c", "\
     if [ ! -f \"$VOL_SETTINGS\" ]; then \
-        cp $SRC_SETTINGS $VOL_SETTINGS; \
+    cp $SRC_SETTINGS $VOL_SETTINGS; \
     fi && \
     if [ -f \"$SRC_SETTINGS\" ]; then \
-        rm $SRC_SETTINGS; \
+    rm $SRC_SETTINGS; \
     fi && \
     ln -s $VOL_SETTINGS $SRC_SETTINGS && \
     dotnet $DLL_NAME --urls http://*:5000 \
-"]
+    "]
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=180s --retries=3 CMD \
-wget --quiet --tries=1 --spider http://localhost:5000/health || exit 1
+    wget --quiet --tries=1 --spider http://localhost:5000/health || exit 1

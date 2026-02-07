@@ -25,6 +25,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
   showInfo = true;
+  isLoading = false;
+  guessedScore: number | null = null;
+  isGuessing = false;
 
   // Slideshow
   isPlaying = false;
@@ -118,15 +121,49 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   updateOverlay(photoId: number) {
     if (!photoId) return;
 
-    this.photoService.getPhoto(photoId).subscribe(photo => {
-      this.currentPhoto = photo;
+    if (this.currentPhoto?.id !== photoId) {
+      this.currentPhoto = null;
+    }
+    this.guessedScore = null;
+    this.isLoading = true;
+    this.photoService.getPhoto(photoId).subscribe({
+      next: (photo) => {
+        this.currentPhoto = photo;
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error(err);
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      }
     });
 
     this.photoService.viewPhoto(photoId).subscribe();
   }
 
+  guessScore(event?: Event) {
+    if (event) event.stopPropagation();
+    if (!this.currentPhoto || this.isGuessing) return;
+
+    this.isGuessing = true;
+    this.photoService.guessScore(this.currentPhoto.id).subscribe({
+      next: (score) => {
+        this.guessedScore = score;
+        this.isGuessing = false;
+      },
+      error: (err) => {
+        console.error(err);
+        this.isGuessing = false;
+      }
+    });
+  }
+
   onClose() {
     this.stopSlideshow();
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(err => console.error(err));
+    }
     this.close.emit();
   }
 
@@ -143,6 +180,11 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   startSlideshow() {
     this.isPlaying = true;
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    }
     this.timer = setInterval(() => {
       if (this.swiper) {
         if (this.swiper.isEnd) {
@@ -189,6 +231,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
     if (!this.currentPhoto) return;
 
+    this.isLoading = true;
     this.photoService.ratePhoto(this.currentPhoto.id, score).subscribe({
       next: (updatedPhoto) => {
         // Preserve album if missing
@@ -197,13 +240,19 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         }
 
         this.currentPhoto = updatedPhoto;
+        this.isLoading = false;
         // Optionally update the photo in the list if reference is shared or find it by ID
         const index = this.photos.findIndex(p => p.id === updatedPhoto.id);
         if (index !== -1) {
           this.photos[index] = { ...this.photos[index], ...updatedPhoto };
         }
+        this.cdr.detectChanges();
       },
-      error: (err) => console.error(err)
+      error: (err) => {
+        console.error(err);
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 

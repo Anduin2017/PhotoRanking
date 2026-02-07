@@ -1,13 +1,31 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace Anduin.PhotoRanking.Services;
 
 public class ImageAnalysisService
 {
-    private const int ResizeWidth = 32;
-    private const int ResizeHeight = 32;
+    // CLIP output dimension is 512
+
+
+    private static Lazy<InferenceSession> _session = new(() => {
+        try 
+        {
+            var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "clip-visual.onnx");
+            var options = new Microsoft.ML.OnnxRuntime.SessionOptions(); 
+            // Optional: Explicitly set execution provider if needed, but CPU is default.
+            return new InferenceSession(modelPath, options);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"CRITICAL ERROR initializing OnnxRuntime: {e}");
+            if (e.InnerException != null) Console.WriteLine($"Inner: {e.InnerException}");
+            throw;
+        }
+    });
 
     public byte[]? GenerateVector(string filePath)
     {
@@ -15,13 +33,19 @@ public class ImageAnalysisService
         {
             using var image = Image.Load<Rgba32>(filePath);
             
-            // Resize to 32x32 to reduce dimensionality while keeping structure
+            // Resize to 224x224 (CLIP standard)
             image.Mutate(x => x
-                .Resize(ResizeWidth, ResizeHeight)
-                .Grayscale());
+                .Resize(new ResizeOptions 
+                {
+                    Size = new Size(224, 224),
+                    Mode = ResizeMode.Crop
+                }));
 
-            var floatArray = new float[ResizeWidth * ResizeHeight];
-            var index = 0;
+            var input = new DenseTensor<float>(new[] { 1, 3, 224, 224 });
+            
+            // CLIP Mean and Std
+            var mean = new[] { 0.48145466f, 0.4578275f, 0.40821073f };
+            var std = new[] { 0.26862954f, 0.26130258f, 0.27577711f };
 
             image.ProcessPixelRows(accessor =>
             {
@@ -30,22 +54,36 @@ public class ImageAnalysisService
                     var pixelRow = accessor.GetRowSpan(y);
                     for (int x = 0; x < pixelRow.Length; x++)
                     {
-                        // R, G, B are same in grayscale. Normalize to 0-1.
-                        floatArray[index++] = pixelRow[x].R / 255f;
+                        var pixel = pixelRow[x];
+                        
+                        // Normalize: (Pixel - Mean) / Std
+                        input[0, 0, y, x] = ((pixel.R / 255f) - mean[0]) / std[0];
+                        input[0, 1, y, x] = ((pixel.G / 255f) - mean[1]) / std[1];
+                        input[0, 2, y, x] = ((pixel.B / 255f) - mean[2]) / std[2];
                     }
                 }
             });
 
-            return FloatArrayToByteArray(floatArray);
+            var inputs = new List<NamedOnnxValue> 
+            { 
+                NamedOnnxValue.CreateFromTensor("pixel_values", input) 
+            };
+            
+            using var results = _session.Value.Run(inputs);
+            var output = results.First().AsTensor<float>();
+            
+            return FloatArrayToByteArray(output.ToArray());
         }
-        catch
+        catch (Exception e)
         {
+            Console.WriteLine($"Error processing image {filePath}: {e.Message}");
             return null;
         }
     }
 
     private byte[] FloatArrayToByteArray(float[] floatArray)
     {
+        // 512 floats * 4 bytes = 2048 bytes
         var byteArray = new byte[floatArray.Length * 4];
         Buffer.BlockCopy(floatArray, 0, byteArray, 0, byteArray.Length);
         return byteArray;
@@ -56,5 +94,25 @@ public class ImageAnalysisService
         var floatArray = new float[byteArray.Length / 4];
         Buffer.BlockCopy(byteArray, 0, floatArray, 0, byteArray.Length);
         return floatArray;
+    }
+
+    public static double CalculateCosineSimilarity(float[] vectorA, float[] vectorB)
+    {
+        if (vectorA.Length != vectorB.Length) return 0;
+
+        double dotProduct = 0;
+        double normA = 0;
+        double normB = 0;
+
+        for (int i = 0; i < vectorA.Length; i++)
+        {
+            dotProduct += vectorA[i] * vectorB[i];
+            normA += vectorA[i] * vectorA[i];
+            normB += vectorB[i] * vectorB[i];
+        }
+
+        if (normA == 0 || normB == 0) return 0;
+
+        return dotProduct / (Math.Sqrt(normA) * Math.Sqrt(normB));
     }
 }
