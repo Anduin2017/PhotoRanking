@@ -361,6 +361,7 @@ public class PhotosController : ControllerBase
     {
         // 1. 使用 Window Function 分层获取每个分数段的前20名相似照片
         // 这样可以避免高分照片数量过多导致的样本偏差
+        // Added AsNoTracking to avoid tracking overhead and potential navigation property issues
         var similarRatedPhotos = await _context.Photos
             .FromSqlInterpolated($@"
                 WITH Ranked AS (
@@ -383,6 +384,7 @@ public class PhotosController : ControllerBase
                 FROM Photos p
                 INNER JOIN Ranked r ON p.Id = r.Id
                 WHERE r.Rank <= 20")
+            .AsNoTracking()
             .ToListAsync();
 
         if (similarRatedPhotos.Count == 0)
