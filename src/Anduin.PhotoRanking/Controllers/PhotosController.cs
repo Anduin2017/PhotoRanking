@@ -31,39 +31,19 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 获取首页照片流（基于未评分照片的质量预测推荐）
+    /// 获取首页照片流（基于未评分照片的并行质量预测推荐）
     /// </summary>
     [HttpGet("feed")]
     public async Task<ActionResult<List<Photo>>> GetFeed(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int size = 20,
+        [FromQuery] int pool = 200)
     {
-        // 目前只支持第一页
-        if (page != 1)
-        {
-            return Ok(new List<Photo>());
-        }
-
-        // 1. 获取已知率在 (0, 1) 之间的前100个相册
-        var topAlbums = await _context.Albums
-            .Where(a => a.KnownRate > 0 && a.KnownRate < 1)
-            .OrderByDescending(a => a.KnownRate)
-            .Take(100)
-            .ToListAsync();
-
-        if (topAlbums.Count == 0)
-        {
-            return Ok(new List<Photo>());
-        }
-
-        var albumIds = topAlbums.Select(a => a.AlbumId).ToList();
-
-        // 2. 从这些相册中随机抽取100张未评分照片
+        // 1. 从全库随机抽取未评分照片
         var unratedPhotos = await _context.Photos
             .Include(p => p.Album)
-            .Where(p => albumIds.Contains(p.AlbumId) && p.IndependentScore == null)
+            .Where(p => p.IndependentScore == null)
             .OrderBy(p => EF.Functions.Random())
-            .Take(100)
+            .Take(pool)
             .ToListAsync();
 
         if (unratedPhotos.Count == 0)
@@ -71,48 +51,21 @@ public class PhotosController : ControllerBase
             return Ok(new List<Photo>());
         }
 
-        // 3. 按预测分数分组
-        var score5Photos = new List<Photo>();
-        var score4Photos = new List<Photo>();
-        var score3Photos = new List<Photo>();
-
-        foreach (var photo in unratedPhotos)
+        // 2. 并行计算每张照片的预测分数
+        var photoScoreTasks = unratedPhotos.Select(async photo =>
         {
             var predictedScore = await GuessScoreInternal(photo);
-            
-            if (predictedScore == 5)
-            {
-                score5Photos.Add(photo);
-            }
-            else if (predictedScore == 4)
-            {
-                score4Photos.Add(photo);
-            }
-            else if (predictedScore == 3)
-            {
-                score3Photos.Add(photo);
-            }
+            return new { Photo = photo, Score = predictedScore };
+        }).ToList();
 
-            // 如果已经有足够的5分照片，可以提前结束
-            if (score5Photos.Count >= pageSize)
-            {
-                break;
-            }
-        }
+        var photoScores = await Task.WhenAll(photoScoreTasks);
 
-        // 4. 优先返回5分，不够再4分，再3分，凑够20张
-        var result = new List<Photo>();
-        result.AddRange(score5Photos.Take(pageSize));
-        
-        if (result.Count < pageSize)
-        {
-            result.AddRange(score4Photos.Take(pageSize - result.Count));
-        }
-        
-        if (result.Count < pageSize)
-        {
-            result.AddRange(score3Photos.Take(pageSize - result.Count));
-        }
+        // 3. 按预测分数降序排序，返回前N张
+        var result = photoScores
+            .OrderByDescending(ps => ps.Score)
+            .Take(size)
+            .Select(ps => ps.Photo)
+            .ToList();
 
         return Ok(result);
     }

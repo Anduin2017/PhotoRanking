@@ -65,8 +65,8 @@ export class PhotoService {
     return `${this.apiBase}/images/${encodeURI(filePath)}`;
   }
 
-  getFeed(page: number, pageSize: number): Observable<Photo[]> {
-    return this.http.get<Photo[]>(`${this.apiBase}/photos/feed?page=${page}&pageSize=${pageSize}`);
+  getFeed(size: number = 20, pool: number = 200): Observable<Photo[]> {
+    return this.http.get<Photo[]>(`${this.apiBase}/photos/feed?size=${size}&pool=${pool}`);
   }
 
   getPhoto(id: number): Observable<Photo> {

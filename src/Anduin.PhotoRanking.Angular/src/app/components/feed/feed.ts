@@ -13,10 +13,10 @@ import { RouterModule, ActivatedRoute } from '@angular/router';
 })
 export class FeedComponent implements OnInit {
   photos: Photo[] = [];
-  page = 1;
   isLoading = false;
   hasMore = true;
   pageSize = 20;
+  pool = 200;
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -42,16 +42,12 @@ export class FeedComponent implements OnInit {
     if (this.isLoading || !this.hasMore) return;
 
     this.isLoading = true;
-    this.photoService.getFeed(this.page, this.pageSize).subscribe({
+    this.photoService.getFeed(this.pageSize, this.pool).subscribe({
       next: (newPhotos) => {
         if (newPhotos.length === 0) {
           this.hasMore = false;
         } else {
           this.photos = [...this.photos, ...newPhotos];
-          this.page++;
-          if (newPhotos.length < this.pageSize) {
-            this.hasMore = false;
-          }
         }
         this.isLoading = false;
       },
