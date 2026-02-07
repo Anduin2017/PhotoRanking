@@ -33,20 +33,21 @@ Then run the following commands in a Linux shell:
 image=anduin2019/photoranking
 appName=photoranking
 sudo docker pull $image
-sudo docker run -d --name $appName --restart unless-stopped -p 5000:5000 -v /var/www/$appName:/data /your-photos:/photos $image
+sudo docker run -d --name $appName --restart unless-stopped -p 5000:5000 -v /var/www/$appName:/data -v /your-photos:/photos $image
 ```
 
 That will start a web server at `http://localhost:5000` and you can test the app.
 
 The docker image has the following context:
 
-| Properties  | Value                           |
-|-------------|---------------------------------|
-| Image       | anduin2019/photoranking         |
-| Ports       | 5000                            |
-| Binary path | /app                            |
-| Data path   | /data                           |
-| Config path | /data/appsettings.json          |
+| Properties    | Value                           |
+|---------------|---------------------------------|
+| Image         | anduin2019/photoranking         |
+| Ports         | 5000                            |
+| Binary path   | /app                            |
+| Data path     | /data                           |
+| Photos import | /photos                           |
+| Config path   | /data/appsettings.json          |
 
 ## How to contribute
 
