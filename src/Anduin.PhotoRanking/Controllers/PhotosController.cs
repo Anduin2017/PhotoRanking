@@ -366,7 +366,9 @@ public class PhotosController : ControllerBase
                 WITH Ranked AS (
                     SELECT 
                         Id,
+                        -- IndependentScore is needed for partitioning
                         IndependentScore,
+                        -- Distance is needed for ordering
                         VectorDistance(FeatureVector, {targetVectorBytes}) as Distance,
                         ROW_NUMBER() OVER (
                             PARTITION BY CAST(ROUND(IndependentScore) AS INTEGER) 
@@ -377,7 +379,10 @@ public class PhotosController : ControllerBase
                       AND FeatureVector IS NOT NULL 
                       AND IndependentScore IS NOT NULL
                 )
-                SELECT * FROM Ranked WHERE Rank <= 20")
+                SELECT p.* 
+                FROM Photos p
+                INNER JOIN Ranked r ON p.Id = r.Id
+                WHERE r.Rank <= 20")
             .ToListAsync();
 
         if (similarRatedPhotos.Count == 0)
