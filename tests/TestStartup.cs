@@ -2,6 +2,7 @@ using Aiursoft.DbTools.Sqlite;
 using Aiursoft.WebTools.Abstractions.Models;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
+using Aiursoft.Canon;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -22,6 +23,7 @@ public class TestStartup : IWebStartup
         // Services
         services.AddMemoryCache();
         services.AddHttpClient();
+        services.AddTaskCanon();
 
         services.AddScoped<ScoringService>();
         services.AddScoped<SeederService>();
