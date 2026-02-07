@@ -1,3 +1,4 @@
+using Aiursoft.Canon;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
 using Anduin.PhotoRanking.Services;
@@ -15,19 +16,22 @@ public class PhotosController : ControllerBase
     private readonly ILogger<PhotosController> _logger;
     private readonly ImageAnalysisService _imageAnalysis;
     private readonly IConfiguration _configuration;
+    private readonly CanonPool _canonPool;
 
     public PhotosController(
         AppDbContext context, 
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
         ImageAnalysisService imageAnalysis,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        CanonPool canonPool)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
         _imageAnalysis = imageAnalysis;
         _configuration = configuration;
+        _canonPool = canonPool;
     }
 
     /// <summary>
@@ -51,17 +55,26 @@ public class PhotosController : ControllerBase
             return Ok(new List<Photo>());
         }
 
-        // 2. 并行计算每张照片的预测分数
-        var photoScoreTasks = unratedPhotos.Select(async photo =>
-        {
-            var predictedScore = await GuessScoreInternal(photo);
-            return new { Photo = photo, Score = predictedScore };
-        }).ToList();
+        // 2. 并行计算每张照片的预测分数（使用 CanonPool 控制并发数为 20）
+        var photoScoreResults = new List<(Photo Photo, int Score)>();
+        var lockObject = new object();
 
-        var photoScores = await Task.WhenAll(photoScoreTasks);
+        foreach (var photo in unratedPhotos)
+        {
+            _canonPool.RegisterNewTaskToPool(async () =>
+            {
+                var predictedScore = await GuessScoreInternal(photo);
+                lock (lockObject)
+                {
+                    photoScoreResults.Add((photo, predictedScore));
+                }
+            });
+        }
+
+        await _canonPool.RunAllTasksInPoolAsync(20); // 使用 20 个并发线程
 
         // 3. 按预测分数降序排序，返回前N张
-        var result = photoScores
+        var result = photoScoreResults
             .OrderByDescending(ps => ps.Score)
             .Take(size)
             .Select(ps => ps.Photo)
