@@ -31,57 +31,90 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 获取首页照片流（按浏览次数负相关、整体分正相关）
+    /// 获取首页照片流（基于未评分照片的质量预测推荐）
     /// </summary>
     [HttpGet("feed")]
     public async Task<ActionResult<List<Photo>>> GetFeed(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] int count = 0) // 保留count参数向后兼容
+        [FromQuery] int pageSize = 20)
     {
-        // 如果使用了count参数，使用旧逻辑
-        if (count > 0)
-        {
-            pageSize = count;
-            page = 1;
-        }
-
-        var photos = await _context.Photos
-            .Include(p => p.Album)
-            .Where(p => p.OverallScore > 0)
-            .ToListAsync();
-
-        if (photos.Count == 0)
+        // 目前只支持第一页
+        if (page != 1)
         {
             return Ok(new List<Photo>());
         }
 
-        // 计算要选择的总数量
-        int totalToSelect = page * pageSize;
-        var limit = Math.Min(totalToSelect, photos.Count);
+        // 1. 获取已知率在 (0, 1) 之间的前100个相册
+        var topAlbums = await _context.Albums
+            .Where(a => a.KnownRate > 0 && a.KnownRate < 1)
+            .OrderByDescending(a => a.KnownRate)
+            .Take(100)
+            .ToListAsync();
 
-        // 加权：整体分高、浏览次数低的照片权重更高
-        var selectedPhotos = new List<Photo>();
-        for (int i = 0; i < limit; i++)
+        if (topAlbums.Count == 0)
         {
-            var photo = _scoringService.WeightedRandomSelect(photos, p =>
-            {
-                var scoreWeight = Math.Pow(p.OverallScore, 2); // 分数平方作为权重
-                var viewPenalty = 1.0 / (p.ViewCount + 1); // 浏览次数越多，权重越低
-                return scoreWeight * viewPenalty;
-            });
-
-            selectedPhotos.Add(photo);
-            photos.Remove(photo); // 避免重复
+            return Ok(new List<Photo>());
         }
 
-        // 只返回当前页的照片
-        var currentPagePhotos = selectedPhotos
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
+        var albumIds = topAlbums.Select(a => a.AlbumId).ToList();
 
-        return Ok(currentPagePhotos);
+        // 2. 从这些相册中随机抽取100张未评分照片
+        var unratedPhotos = await _context.Photos
+            .Include(p => p.Album)
+            .Where(p => albumIds.Contains(p.AlbumId) && p.IndependentScore == null)
+            .OrderBy(p => EF.Functions.Random())
+            .Take(100)
+            .ToListAsync();
+
+        if (unratedPhotos.Count == 0)
+        {
+            return Ok(new List<Photo>());
+        }
+
+        // 3. 按预测分数分组
+        var score5Photos = new List<Photo>();
+        var score4Photos = new List<Photo>();
+        var score3Photos = new List<Photo>();
+
+        foreach (var photo in unratedPhotos)
+        {
+            var predictedScore = await GuessScoreInternal(photo);
+            
+            if (predictedScore == 5)
+            {
+                score5Photos.Add(photo);
+            }
+            else if (predictedScore == 4)
+            {
+                score4Photos.Add(photo);
+            }
+            else if (predictedScore == 3)
+            {
+                score3Photos.Add(photo);
+            }
+
+            // 如果已经有足够的5分照片，可以提前结束
+            if (score5Photos.Count >= pageSize)
+            {
+                break;
+            }
+        }
+
+        // 4. 优先返回5分，不够再4分，再3分，凑够20张
+        var result = new List<Photo>();
+        result.AddRange(score5Photos.Take(pageSize));
+        
+        if (result.Count < pageSize)
+        {
+            result.AddRange(score4Photos.Take(pageSize - result.Count));
+        }
+        
+        if (result.Count < pageSize)
+        {
+            result.AddRange(score3Photos.Take(pageSize - result.Count));
+        }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -383,6 +416,50 @@ public class PhotosController : ControllerBase
             predictedScore = winningScore,
             votes = votes.OrderByDescending(kv => kv.Value).ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value, 2))
         });
+    }
+
+    /// <summary>
+    /// 内部方法：猜测单张照片的分数（不返回投票详情）
+    /// </summary>
+    private async Task<int> GuessScoreInternal(Photo targetPhoto)
+    {
+        var vector = await EnsureFeatureVector(targetPhoto);
+        if (vector == null)
+        {
+            return 0;
+        }
+
+        var similarRatedPhotos = await _context.Photos
+            .FromSqlInterpolated($@"
+                SELECT * FROM Photos 
+                WHERE Id != {targetPhoto.Id} AND FeatureVector IS NOT NULL AND IndependentScore IS NOT NULL
+                ORDER BY VectorDistance(FeatureVector, {vector}) ASC
+                LIMIT 100")
+            .ToListAsync();
+
+        if (similarRatedPhotos.Count == 0)
+        {
+            return 0;
+        }
+
+        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vector);
+        var votes = new Dictionary<int, double>();
+
+        foreach (var photo in similarRatedPhotos)
+        {
+            var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
+            var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
+            var weight = Math.Exp(similarity * 10);
+            var score = (int)Math.Round(photo.IndependentScore!.Value);
+            
+            if (!votes.ContainsKey(score))
+            {
+                votes[score] = 0;
+            }
+            votes[score] += weight;
+        }
+
+        return votes.OrderByDescending(kv => kv.Value).First().Key;
     }
 
     private async Task<byte[]?> EnsureFeatureVector(Photo targetPhoto)
