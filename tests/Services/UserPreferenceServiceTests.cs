@@ -1,11 +1,9 @@
-using Aiursoft.DbTools.Sqlite;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
 using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Anduin.PhotoRanking.Tests.Services;
 
@@ -97,7 +95,7 @@ public class UserPreferenceServiceTests
                 FilePath = $"x_{i}.jpg", 
                 AlbumId = "test-album",
                 OverallScore = 5.0, // High score
-                FeatureVector = CreateVector(new float[] { 10f, 0f }) // Magnitude doesn't matter for direction
+                FeatureVector = CreateVector([10f, 0f]) // Magnitude doesn't matter for direction
             });
         }
         
@@ -109,7 +107,7 @@ public class UserPreferenceServiceTests
                 FilePath = $"y_{i}.jpg", 
                 AlbumId = "test-album",
                 OverallScore = 5.0, // High score
-                FeatureVector = CreateVector(new float[] { 0f, 10f }) 
+                FeatureVector = CreateVector([0f, 10f]) 
             });
         }
 
@@ -121,7 +119,7 @@ public class UserPreferenceServiceTests
                 FilePath = $"dummy_{i}.jpg", 
                 AlbumId = "test-album",
                 OverallScore = 1.0, 
-                FeatureVector = CreateVector(new float[] { 0f, 0f }) 
+                FeatureVector = CreateVector([0f, 0f]) 
             });
         }
 
@@ -183,7 +181,7 @@ public class UserPreferenceServiceTests
                 FilePath = $"x_{i}.jpg", 
                 AlbumId = "test-album-large",
                 OverallScore = 5.0, 
-                FeatureVector = CreateVector(new float[] { 1f, 0.05f * i }) // Slight noise
+                FeatureVector = CreateVector([1f, 0.05f * i]) // Slight noise
             });
         }
 
@@ -195,7 +193,7 @@ public class UserPreferenceServiceTests
                 FilePath = $"y_{i}.jpg", 
                 AlbumId = "test-album-large",
                 OverallScore = 5.0, 
-                FeatureVector = CreateVector(new float[] { 0.05f * i, 1f }) // Slight noise
+                FeatureVector = CreateVector([0.05f * i, 1f]) // Slight noise
             });
         }
 
@@ -207,7 +205,7 @@ public class UserPreferenceServiceTests
                 FilePath = $"dummy_{i}.jpg", 
                 AlbumId = "test-album-large",
                 OverallScore = 1.0, 
-                FeatureVector = CreateVector(new float[] { 0f, 0f }) 
+                FeatureVector = CreateVector([0f, 0f]) 
             });
         }
 
@@ -227,9 +225,9 @@ public class UserPreferenceServiceTests
             Assert.IsNotNull(resultBytes);
             var resultVector = BytesToFloats(resultBytes);
 
-            var simX = CosineSimilarity(resultVector, BytesToFloats(CreateVector(new float[] { 1f, 0f })));
-            var simY = CosineSimilarity(resultVector, BytesToFloats(CreateVector(new float[] { 0f, 1f })));
-            var simAvg = CosineSimilarity(resultVector, BytesToFloats(CreateVector(new float[] { 1f, 1f })));
+            var simX = CosineSimilarity(resultVector, BytesToFloats(CreateVector([1f, 0f])));
+            var simY = CosineSimilarity(resultVector, BytesToFloats(CreateVector([0f, 1f])));
+            var simAvg = CosineSimilarity(resultVector, BytesToFloats(CreateVector([1f, 1f])));
 
             // It should be close to X or Y (Sim > 0.9)
             // It should NOT be close to Average (Sim < 0.8 for orthogonal vectors, actually 45deg is 0.707)
