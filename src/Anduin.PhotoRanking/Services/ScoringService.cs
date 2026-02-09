@@ -152,10 +152,10 @@ public class ScoringService
                 allPhotoScores.Add(photo.IndependentScore ?? unratedScore);
             }
             
-            // 排序并取前20%（至少取1张）
+            // 排序并取前80%（至少取1张）
             var sortedScores = allPhotoScores.OrderByDescending(s => s).ToList();
-            var top20PercentCount = Math.Max(1, (int)Math.Ceiling(sortedScores.Count * 0.2));
-            var topScores = sortedScores.Take(top20PercentCount);
+            var top80PercentCount = Math.Max(1, (int)Math.Ceiling(sortedScores.Count * 0.8));
+            var topScores = sortedScores.Take(top80PercentCount);
             
             album.AlbumScore = topScores.Average();
         }

@@ -172,11 +172,8 @@ public class SeederService(
                 sw.Elapsed, allIdsToUpdate.Count / sw.Elapsed.TotalSeconds);
         }
 
-        // 更新相册统计
-        if (albumsToAdd.Count > 0 || photosToAdd.Count > 0 || photosToRemove.Count > 0 || albumsToRemove.Count > 0)
-        {
-            await UpdateAlbumStatsAsync();
-        }
+        // 更新相册统计 (Always update to ensure score calculation rules are applied)
+        await UpdateAlbumStatsAsync();
     }
 
     /// <summary>
@@ -299,10 +296,21 @@ public class SeederService(
             if (ratedPhotos.Count > 0)
             {
                 var avgRated = ratedPhotos.Average(p => p.IndependentScore!.Value);
-                var unratedScore = avgRated - 1;
-                var unratedCount = album.PhotoCount - ratedPhotos.Count;
-
-                album.AlbumScore = (ratedPhotos.Sum(p => p.IndependentScore!.Value) + unratedCount * unratedScore) / album.PhotoCount;
+                var unratedScore = Math.Max(0, avgRated - 1);
+                
+                // 构建所有照片的分数列表（已评分用独立分，未评分用 unratedScore）
+                var allPhotoScores = new List<double>();
+                foreach (var photo in album.Photos)
+                {
+                    allPhotoScores.Add(photo.IndependentScore ?? unratedScore);
+                }
+            
+                // 排序并取前80%（至少取1张）
+                var sortedScores = allPhotoScores.OrderByDescending(s => s).ToList();
+                var top80PercentCount = Math.Max(1, (int)Math.Ceiling(sortedScores.Count * 0.8));
+                var topScores = sortedScores.Take(top80PercentCount);
+            
+                album.AlbumScore = topScores.Average();
             }
             else
             {
