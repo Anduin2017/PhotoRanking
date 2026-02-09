@@ -147,4 +147,74 @@ public class SixPointTests
         var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [TestMethod]
+    public async Task TestSixPointUnlockLogic_BoundaryScore_Above()
+    {
+        int photoId;
+        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.9 (Should Pass > 3.8)
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            
+            var album = new Album 
+            { 
+                AlbumId = "boundary-above", 
+                Name = "Boundary Above",
+                AlbumScore = 3.9 
+            };
+            context.Albums.Add(album);
+            
+            var photo = new Photo 
+            { 
+                FilePath = "boundary_above.jpg", 
+                AlbumId = "boundary-above", 
+                IndependentScore = 5.0, 
+                OverallScore = 5.0,
+                RatingCount = 9
+            };
+            context.Photos.Add(photo);
+            await context.SaveChangesAsync();
+            photoId = photo.Id;
+        }
+
+        // 2. Try to rate 6
+        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task TestSixPointUnlockLogic_BoundaryScore_Exact()
+    {
+        int photoId;
+        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.8 (Should Fail not > 3.8)
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            
+            var album = new Album 
+            { 
+                AlbumId = "boundary-exact", 
+                Name = "Boundary Exact",
+                AlbumScore = 3.8 
+            };
+            context.Albums.Add(album);
+            
+            var photo = new Photo 
+            { 
+                FilePath = "boundary_exact.jpg", 
+                AlbumId = "boundary-exact", 
+                IndependentScore = 5.0, 
+                OverallScore = 5.0,
+                RatingCount = 9
+            };
+            context.Photos.Add(photo);
+            await context.SaveChangesAsync();
+            photoId = photo.Id;
+        }
+
+        // 2. Try to rate 6
+        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }
