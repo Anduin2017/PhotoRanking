@@ -57,14 +57,14 @@ public class AdminController : ControllerBase
             TotalPhotoCount = totalPhotos
         };
 
-        // Initialize 0-5 keys
-        for (int i = 0; i <= 5; i++) stats.ScoreDistribution[i] = 0;
+        // Initialize 0-6 keys
+        for (int i = 0; i <= 6; i++) stats.ScoreDistribution[i] = 0;
 
         foreach (var score in photoScores)
         {
             var rounded = (int)Math.Round(score);
             if (rounded < 0) rounded = 0;
-            if (rounded > 5) rounded = 5;
+            if (rounded > 6) rounded = 6;
             stats.ScoreDistribution[rounded]++;
         }
 

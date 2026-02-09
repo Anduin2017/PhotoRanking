@@ -27,7 +27,7 @@
         <input type="range" 
                id="minScoreRange" 
                min="0" 
-               max="5" 
+               max="6" 
                step="0.1" 
                [value]="minScore" 
                (input)="minScore = +$any($event.target).value"
@@ -37,7 +37,7 @@
     <div *ngIf="mode === 'featured'" class="discover-filter-container">
         <label>选择独立分:</label>
         <div class="score-selector">
-            <button *ngFor="let s of [0, 1, 2, 3, 4, 5]" 
+            <button *ngFor="let s of [0, 1, 2, 3, 4, 5, 6]" 
                     class="score-btn" 
                     [class.active]="minScore === s"
                     (click)="setMinScore(s)">

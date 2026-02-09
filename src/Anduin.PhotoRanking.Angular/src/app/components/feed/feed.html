@@ -17,6 +17,11 @@
                             (click)="onRate(photo, score, $event)">
                         {{ score }}
                     </button>
+                    <button *ngIf="isSixUnlocked(photo)"
+                            class="rating-btn-inline"
+                            (click)="onRate(photo, 6, $event)">
+                        6
+                    </button>
                 </div>
             </div>
         </div>

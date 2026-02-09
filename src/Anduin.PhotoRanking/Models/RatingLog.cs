@@ -14,7 +14,9 @@ public class RatingLog
     // [规则 2.2] 外键ID：required int
     public required int PhotoId { get; set; }
     
-    // 打分（0-5）
+    /// <summary>
+    /// 打分（0-6）
+    /// </summary>
     public int Score { get; set; }
     
     // [规则 4.3] 系统字段 - 创建后不可变

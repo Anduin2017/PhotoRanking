@@ -67,7 +67,7 @@
             <div class="global-stat-card" style="margin-top: 1rem;">
                 <h3 style="margin-bottom: 1rem; font-size: 1.2rem; color: var(--text-primary);">分数分布</h3>
                 <div class="score-bars">
-                    <div *ngFor="let item of [5,4,3,2,1,0]" style="display: flex; align-items: center; margin-bottom: 0.5rem; gap: 1rem;">
+                    <div *ngFor="let item of [6,5,4,3,2,1,0]" style="display: flex; align-items: center; margin-bottom: 0.5rem; gap: 1rem;">
                         <span style="width: 30px; font-weight: bold; color: var(--text-primary);">{{ item }}分</span>
                         <div style="flex: 1; height: 16px; background: var(--bg-secondary); border-radius: 8px; overflow: hidden;">
                              <div [style.width.%]="(globalStats.ratedCount > 0 ? (globalStats.scoreDistribution[item] / globalStats.ratedCount * 100) : 0)" 

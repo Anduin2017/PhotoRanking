@@ -56,7 +56,7 @@ PhotoRanking implements a sophisticated multi-layered scoring system that combin
 ### Three Core Score Types
 
 1. **Independent Score** (`IndependentScore`)
-   - Direct user rating for a single photo (0-5 scale)
+   - Direct user rating for a single photo (0-6 scale)
    - Represents the photo's intrinsic quality
    - Becomes `null` if the photo has never been rated
    - **Fixation mechanism**: If the last 3 consecutive ratings are identical, the photo is marked as `IsFixed = true` and the score is locked
@@ -106,7 +106,7 @@ When you rate a photo highly, it raises the album's average, which in turn incre
 
 For unrated photos, the system can predict scores using a **Stratified KNN (K-Nearest Neighbors) algorithm** based on image similarity:
 
-1. **Stratified Sampling**: Uses SQL window functions to select the top 20 most similar photos from each score tier (0-5), preventing bias from overrepresented high-score photos
+1. **Stratified Sampling**: Uses SQL window functions to select the top 20 most similar photos from each score tier (0-6), preventing bias from overrepresented high-score photos
 
 2. **Top-K Similarity Matching**: For each score tier, calculates cosine similarity between feature vectors and takes the **average of the top 3** most similar photos (not all photos), ensuring that even rare cases are properly weighted
 
@@ -114,11 +114,11 @@ For unrated photos, the system can predict scores using a **Stratified KNN (K-Ne
 
 4. **SmoothStep Smoothing**: Applies Hermite interpolation to the predicted score for more natural distribution:
    ```
-   t = rawScore / 5.0
+   t = rawScore / 6.0
    smoothed = t² × (3 - 2t)
-   finalScore = smoothed × 5.0
+   finalScore = smoothed × 6.0
    ```
-   This makes predicted scores like 4.0 → 4.48, avoiding clustering at integer values
+   This makes predicted scores more natural, avoiding clustering at integer values
 
 ### Knownness Score
 

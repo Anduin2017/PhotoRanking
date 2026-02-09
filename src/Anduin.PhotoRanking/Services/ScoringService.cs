@@ -25,19 +25,19 @@ public class ScoringService
 
     /// <summary>
     /// 应用 SmoothStep 算法（Hermite 插值）来平滑分数
-    /// 公式：t = x/5, y = 5 * (t^2 * (3 - 2t))
+    /// 公式：t = x/6, y = 6 * (t^2 * (3 - 2t))
     /// 例如：4.0 -> 4.48 (接近 4.5)
     /// </summary>
     private double ApplySmoothStep(double score)
     {
         // 将分数归一化到 [0, 1] 区间
-        double t = score / 5.0;
+        double t = score / 6.0;
         
         // Hermite 插值公式：t^2 * (3 - 2t)
         double smoothed = t * t * (3.0 - 2.0 * t);
         
-        // 还原到 [0, 5] 区间
-        return smoothed * 5.0;
+        // 还原到 [0, 6] 区间
+        return smoothed * 6.0;
     }
 
     /// <summary>
@@ -45,9 +45,9 @@ public class ScoringService
     /// </summary>
     public async Task<Photo> RatePhotoAsync(int photoId, int score)
     {
-        if (score < 0 || score > 5)
+        if (score < 0 || score > 6)
         {
-            throw new ArgumentException("Score must be between 0 and 5", nameof(score));
+            throw new ArgumentException("Score must be between 0 and 6", nameof(score));
         }
 
         var photo = await _context.Photos
@@ -58,6 +58,19 @@ public class ScoringService
         if (photo == null)
         {
             throw new InvalidOperationException($"Photo {photoId} not found");
+        }
+
+        // 验证打 6 分的条件
+        if (score == 6)
+        {
+            var isEligibleForSix = photo.RatingCount > 8 &&
+                                  Math.Round(photo.IndependentScore ?? 0) >= 5 &&
+                                  photo.Album.AlbumScore > 4.1;
+            
+            if (!isEligibleForSix)
+            {
+                throw new InvalidOperationException("This photo is not eligible for a 6-point rating yet.");
+            }
         }
 
         // 记录打分日志
@@ -313,8 +326,8 @@ public class ScoringService
 
         var scoreConfidences = new Dictionary<int, double>();
 
-        // 遍历可能的 0-5 分
-        for (int i = 0; i <= 5; i++)
+        // 遍历可能的 0-6 分
+        for (int i = 0; i <= 6; i++)
         {
             if (!scoreGroups.ContainsKey(i))
             {
