@@ -245,6 +245,13 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     return Math.round(this.currentPhoto.independentScore) === score;
   }
 
+  get isSixUnlocked(): boolean {
+    if (!this.currentPhoto || !this.currentPhoto.album) return false;
+    return this.currentPhoto.ratingCount > 8 && 
+           Math.round(this.currentPhoto.independentScore ?? 0) >= 5 && 
+           this.currentPhoto.album.albumScore > 4.1;
+  }
+
   openAlbum() {
     if (this.currentPhoto) {
       this.onClose();
@@ -282,6 +289,8 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
       this.onClose();
     } else if (event.key >= '0' && event.key <= '5') {
       this.ratePhoto(parseInt(event.key));
+    } else if (event.key === '6' && this.isSixUnlocked) {
+      this.ratePhoto(6);
     }
   }
 }

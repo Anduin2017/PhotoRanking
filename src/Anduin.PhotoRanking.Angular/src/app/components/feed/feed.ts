@@ -68,6 +68,13 @@ export class FeedComponent implements OnInit {
     this.initialPhotoId = null;
   }
 
+  isSixUnlocked(photo: Photo): boolean {
+    if (!photo.album) return false;
+    return photo.ratingCount > 8 && 
+           Math.round(photo.independentScore ?? 0) >= 5 && 
+           photo.album.albumScore > 4.1;
+  }
+
   onRate(photo: Photo, score: number, event: Event) {
     event.stopPropagation();
     this.photoService.ratePhoto(photo.id, score).subscribe({
