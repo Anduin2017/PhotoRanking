@@ -46,75 +46,187 @@ public class UserPreferenceService
             var takeCount = (int)Math.Max(1, Math.Ceiling(totalCount * percentile / 100.0));
 
             // Optimize: Only fetch FeatureVector for top photos
-            var topVectors = await _context.Photos
+            var topVectorsBytes = await _context.Photos
                 .Where(p => p.FeatureVector != null)
                 .OrderByDescending(p => p.OverallScore)
                 .Take(takeCount)
                 .Select(p => p.FeatureVector)
                 .ToListAsync();
 
-            if (topVectors.Count == 0) return null;
+            if (topVectorsBytes.Count == 0) return null;
 
-            // 3. Sum vectors
-            // Assuming 512 dimensions (CLIP standard). 
-            // We can detect dimension from the first vector.
-            int dimension = 0;
-            float[]? sumVector = null;
-
-            foreach (var vectorBytes in topVectors)
+            var vectors = new List<float[]>();
+            foreach (var bytes in topVectorsBytes)
             {
-                if (vectorBytes == null) continue;
+                if (bytes != null)
+                {
+                    vectors.Add(ImageAnalysisService.ByteArrayToFloatArray(bytes));
+                }
+            }
 
-                var vector = ImageAnalysisService.ByteArrayToFloatArray(vectorBytes);
+            if (vectors.Count == 0) return null;
+
+            float[] selectedVector;
+
+            // 3. Strategy Selection: K-Means Clustering vs Global Average
+            // If we have enough data points, use clustering to find distinct tastes.
+            // Otherwise, fallback to global average.
+            if (vectors.Count >= 10)
+            {
+                // Dynamic K: roughly 1 cluster per 10 photos.
+                // Min 2: Force separation to avoid "average face".
+                // Max 6: Cap to prevent over-segmentation and performance issues.
+                int k = Math.Clamp(vectors.Count / 10, 2, 6);
                 
-                if (sumVector == null)
-                {
-                    dimension = vector.Length;
-                    sumVector = new float[dimension];
-                }
-
-                if (vector.Length != dimension)
-                {
-                    _logger.LogWarning("Vector dimension mismatch. Expected {Dim}, got {Len}", dimension, vector.Length);
-                    continue;
-                }
-
-                for (int i = 0; i < dimension; i++)
-                {
-                    sumVector[i] += vector[i];
-                }
+                var centroids = RunKMeans(vectors, k);
+                
+                // Randomly select one cluster center to diversify the feed
+                // This solves the "Average Face" problem where averaging anime + landscape = nonsense.
+                selectedVector = centroids[RandomNumberGenerator.GetInt32(centroids.Count)];
+                _logger.LogInformation("Clustered {Count} photos into {K} tastes. Selected taste index {Index}.", vectors.Count, centroids.Count, centroids.IndexOf(selectedVector));
             }
-
-            if (sumVector == null) return null;
-
-            // 4. Normalize (Take the module? user said "take modulo", likely means normalize to unit vector)
-            // Even for cosine distance, normalizing the query vector is good practice though not strictly required if only ranking (since magnitude is constant for all comparisons).
-            // But let's normalize it to be safe and consistent.
-            
-            double normSq = 0;
-            for (int i = 0; i < dimension; i++)
+            else
             {
-                normSq += sumVector[i] * sumVector[i];
-            }
-            
-            double norm = Math.Sqrt(normSq);
-            if (norm > 0)
-            {
-                for (int i = 0; i < dimension; i++)
-                {
-                    sumVector[i] /= (float)norm;
-                }
+                // Fallback: Global Average
+                selectedVector = CalculateMeanVector(vectors);
+                _logger.LogInformation("Calculated global average preference from {Count} photos (top {Percent}%)", vectors.Count, percentile);
             }
 
-            _logger.LogInformation("Calculated user preference vector from top {Count} photos (top {Percent}%)", topVectors.Count, percentile);
+            // 4. Normalize (unit vector)
+            Normalize(selectedVector);
 
             // 5. Convert back to byte[]
-            return FloatArrayToByteArray(sumVector);
+            return FloatArrayToByteArray(selectedVector);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error calculating user preference vector");
             return null;
+        }
+    }
+
+    private float[] CalculateMeanVector(List<float[]> vectors)
+    {
+        int dimension = vectors[0].Length;
+        var sumVector = new float[dimension];
+
+        foreach (var vector in vectors)
+        {
+            if (vector.Length != dimension) continue;
+            for (int i = 0; i < dimension; i++)
+            {
+                sumVector[i] += vector[i];
+            }
+        }
+        return sumVector;
+    }
+
+    private List<float[]> RunKMeans(List<float[]> vectors, int k)
+    {
+        int n = vectors.Count;
+        int dim = vectors[0].Length;
+        int maxIterations = 20;
+
+        // 1. Initialize Centroids (Random Pick)
+        var centroids = new List<float[]>();
+        var usedIndices = new HashSet<int>();
+        
+        // Safety check: if n < k, just return all vectors as centroids
+        if (n <= k) return vectors;
+
+        while (centroids.Count < k)
+        {
+            int idx = RandomNumberGenerator.GetInt32(n);
+            if (usedIndices.Add(idx))
+            {
+                // Deep copy the vector
+                var centroid = new float[dim];
+                Array.Copy(vectors[idx], centroid, dim);
+                centroids.Add(centroid);
+            }
+        }
+
+        int[] assignments = new int[n];
+        Array.Fill(assignments, -1);
+
+        for (int iter = 0; iter < maxIterations; iter++)
+        {
+            bool changed = false;
+
+            // 2. Assignment Step
+            var newClusterSums = new float[k][];
+            var newClusterCounts = new int[k];
+            for (int i = 0; i < k; i++) newClusterSums[i] = new float[dim];
+
+            for (int i = 0; i < n; i++)
+            {
+                double bestSim = -2.0; // Cosine range [-1, 1]
+                int bestCluster = 0;
+
+                for (int c = 0; c < k; c++)
+                {
+                    // Use Cosine Similarity for assignment
+                    double sim = ImageAnalysisService.CalculateCosineSimilarity(vectors[i], centroids[c]);
+                    if (sim > bestSim)
+                    {
+                        bestSim = sim;
+                        bestCluster = c;
+                    }
+                }
+
+                if (assignments[i] != bestCluster)
+                {
+                    assignments[i] = bestCluster;
+                    changed = true;
+                }
+
+                // Accumulate
+                for (int d = 0; d < dim; d++)
+                {
+                    newClusterSums[bestCluster][d] += vectors[i][d];
+                }
+                newClusterCounts[bestCluster]++;
+            }
+
+            if (!changed) break;
+
+            // 3. Update Step
+            for (int c = 0; c < k; c++)
+            {
+                if (newClusterCounts[c] > 0)
+                {
+                    // Normalize the sum to get the new centroid
+                    // No need to divide by count for direction, just normalize directly
+                    centroids[c] = newClusterSums[c];
+                    Normalize(centroids[c]);
+                }
+                else
+                {
+                    // Handle empty cluster: Re-initialize to a random point
+                    var randomVector = vectors[RandomNumberGenerator.GetInt32(n)];
+                    Array.Copy(randomVector, centroids[c], dim);
+                }
+            }
+        }
+
+        return centroids;
+    }
+
+    private void Normalize(float[] vector)
+    {
+        double normSq = 0;
+        for (int i = 0; i < vector.Length; i++)
+        {
+            normSq += vector[i] * vector[i];
+        }
+        
+        double norm = Math.Sqrt(normSq);
+        if (norm > 1e-9)
+        {
+            for (int i = 0; i < vector.Length; i++)
+            {
+                vector[i] /= (float)norm;
+            }
         }
     }
 
