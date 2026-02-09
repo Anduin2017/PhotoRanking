@@ -127,23 +127,50 @@ public class UserPreferenceService
         int dim = vectors[0].Length;
         int maxIterations = 20;
 
-        // 1. Initialize Centroids (Random Pick)
+        // 1. Initialize Centroids using K-Means++ style
         var centroids = new List<float[]>();
-        var usedIndices = new HashSet<int>();
         
-        // Safety check: if n < k, just return all vectors as centroids
-        if (n <= k) return vectors;
+        // Pick first centroid randomly
+        int firstIdx = RandomNumberGenerator.GetInt32(n);
+        var firstCentroid = new float[dim];
+        Array.Copy(vectors[firstIdx], firstCentroid, dim);
+        centroids.Add(firstCentroid);
 
         while (centroids.Count < k)
         {
-            int idx = RandomNumberGenerator.GetInt32(n);
-            if (usedIndices.Add(idx))
+            // Pick next centroid with probability proportional to distance squared from nearest existing centroid
+            var distances = new double[n];
+            double sumDist = 0;
+            for (int i = 0; i < n; i++)
             {
-                // Deep copy the vector
-                var centroid = new float[dim];
-                Array.Copy(vectors[idx], centroid, dim);
-                centroids.Add(centroid);
+                double minDistance = double.MaxValue;
+                foreach (var c in centroids)
+                {
+                    // Use (1 - similarity) as distance
+                    double sim = ImageAnalysisService.CalculateCosineSimilarity(vectors[i], c);
+                    double dist = 1.0 - sim;
+                    if (dist < minDistance) minDistance = dist;
+                }
+                distances[i] = Math.Pow(minDistance, 2);
+                sumDist += distances[i];
             }
+
+            double r = Random.Shared.NextDouble() * sumDist;
+            double cumulative = 0;
+            int nextIdx = n - 1;
+            for (int i = 0; i < n; i++)
+            {
+                cumulative += distances[i];
+                if (r <= cumulative)
+                {
+                    nextIdx = i;
+                    break;
+                }
+            }
+
+            var nextCentroid = new float[dim];
+            Array.Copy(vectors[nextIdx], nextCentroid, dim);
+            centroids.Add(nextCentroid);
         }
 
         int[] assignments = new int[n];
@@ -160,12 +187,11 @@ public class UserPreferenceService
 
             for (int i = 0; i < n; i++)
             {
-                double bestSim = -2.0; // Cosine range [-1, 1]
+                double bestSim = -2.0;
                 int bestCluster = 0;
 
                 for (int c = 0; c < k; c++)
                 {
-                    // Use Cosine Similarity for assignment
                     double sim = ImageAnalysisService.CalculateCosineSimilarity(vectors[i], centroids[c]);
                     if (sim > bestSim)
                     {
@@ -180,7 +206,6 @@ public class UserPreferenceService
                     changed = true;
                 }
 
-                // Accumulate
                 for (int d = 0; d < dim; d++)
                 {
                     newClusterSums[bestCluster][d] += vectors[i][d];
@@ -195,14 +220,11 @@ public class UserPreferenceService
             {
                 if (newClusterCounts[c] > 0)
                 {
-                    // Normalize the sum to get the new centroid
-                    // No need to divide by count for direction, just normalize directly
                     centroids[c] = newClusterSums[c];
                     Normalize(centroids[c]);
                 }
                 else
                 {
-                    // Handle empty cluster: Re-initialize to a random point
                     var randomVector = vectors[RandomNumberGenerator.GetInt32(n)];
                     Array.Copy(randomVector, centroids[c], dim);
                 }

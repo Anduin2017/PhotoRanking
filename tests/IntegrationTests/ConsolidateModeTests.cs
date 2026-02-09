@@ -95,6 +95,6 @@ public class ConsolidateModeTests
         }
 
         Console.WriteLine($"Photo A (90% album): {countA}, Photo B (10% album): {countB}");
-        Assert.IsGreaterThan(countB, countA, "Photo from higher known rate album should appear more frequently");
+        Assert.IsTrue(countA > countB, $"Photo from higher known rate album (A: {countA}) should appear more frequently than lower (B: {countB})");
     }
 }
