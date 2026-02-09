@@ -3,7 +3,19 @@
     <div class="album-header">
         <div class="album-title-section">
             <h1 class="album-title">Similar Photos</h1>
-            <div class="album-meta">Target Photo ID: {{ targetId }}</div>
+            <div class="album-meta" *ngIf="targetPhoto">Searching for photos similar to <strong>#{{ targetPhoto.id }}</strong></div>
+        </div>
+    </div>
+
+    <!-- Target Photo Card -->
+    <div class="target-photo-container" *ngIf="targetPhoto" (click)="openViewer(targetPhoto.id)">
+        <div class="target-photo-card">
+            <div class="target-photo-badge">Target</div>
+            <img [src]="photoService.getImageUrl(targetPhoto.filePath)" class="target-photo-img">
+            <div class="target-photo-info">
+                <div class="target-photo-id">ID: {{ targetPhoto.id }}</div>
+                <div class="target-photo-score">Score: {{ targetPhoto.overallScore | number:'1.2-2' }}</div>
+            </div>
         </div>
     </div>
 
@@ -12,7 +24,10 @@
         <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
             <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
             <div class="discover-item-overlay">
-                <div class="discover-item-score">Score: {{ photo.overallScore | number:'1.2-2' }}</div>
+                <div class="discover-item-score" *ngIf="photo.similarity !== undefined">
+                    Similarity: {{ photo.similarity * 100 | number:'1.1-1' }}%
+                </div>
+                <div class="discover-item-score">Overall Score: {{ photo.overallScore | number:'1.2-2' }}</div>
             </div>
         </div>
     </div>
@@ -32,6 +47,6 @@
 
 <app-photo-viewer *ngIf="viewerOpen"
                   [startPhotoId]="initialPhotoId"
-                  [photos]="photos"
+                  [photos]="viewerPhotos"
                   (close)="closeViewer()">
 </app-photo-viewer>

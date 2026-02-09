@@ -30,6 +30,7 @@ export interface Photo {
   knownness: number;
   ratingCount: number;
   viewCount: number;
+  similarity?: number;
   createdAt: string;
 }
 
