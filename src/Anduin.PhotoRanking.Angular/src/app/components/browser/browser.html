@@ -12,6 +12,17 @@
             </ng-container>
         </div>
 
+        <!-- Sorting -->
+        <div class="browser-sort-options">
+            <span class="sort-label">排序方式:</span>
+            <div class="sort-buttons">
+                <button [class.active]="sortBy === 'name'" (click)="changeSort('name')">字母</button>
+                <button [class.active]="sortBy === 'knownRate'" (click)="changeSort('knownRate')">已知度</button>
+                <button [class.active]="sortBy === 'albumScore'" (click)="changeSort('albumScore')">相册分</button>
+                <button [class.active]="sortBy === 'photoCount'" (click)="changeSort('photoCount')">照片数</button>
+            </div>
+        </div>
+
         <!-- Folders -->
         <div *ngIf="folders.length > 0" class="browser-section">
             <h3 class="browser-section-title">文件夹</h3>
@@ -25,7 +36,13 @@
                             <path d="M19 12H5M12 19l-7-7 7-7"></path>
                         </svg>
                     </div>
-                    <div class="folder-name">{{ folder.name }}</div>
+                    <div class="folder-info">
+                        <div class="folder-name">{{ folder.name }}</div>
+                        <div *ngIf="!folder.isParent" class="folder-stats">
+                            <span>{{ folder.photoCount }} 照片</span>
+                            <span *ngIf="folder.knownRate > 0"> · {{ folder.knownRate | percent:'1.0-0' }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -8,7 +8,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     padding: 1rem;
     background: var(--bg-card);
     border-radius: 12px;
@@ -43,6 +43,50 @@
     color: var(--border);
 }
 
+/* 排序选项 */
+.browser-sort-options {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+    flex-wrap: wrap;
+}
+
+.sort-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.sort-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.sort-buttons button {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sort-buttons button:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.sort-buttons button.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
 .browser-section {
     margin-bottom: 3rem;
 }
@@ -59,7 +103,7 @@
 /* 文件夹网格 */
 .browser-grid-folders {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 1rem;
 }
 
@@ -67,11 +111,11 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 1.2rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 0.8rem;
     cursor: pointer;
     transition: all 0.3s ease;
 }
@@ -84,8 +128,8 @@
 
 .folder-icon {
     color: var(--secondary);
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
 }
 
 .folder-icon svg {
@@ -97,11 +141,26 @@
     stroke-width: 2;
 }
 
+.folder-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+}
+
 .folder-name {
     font-weight: 600;
     text-align: center;
     word-break: break-all;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.folder-stats {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 /* 相册网格 - 复用相册卡片样式但稍作调整 */
