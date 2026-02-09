@@ -249,7 +249,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     if (!this.currentPhoto || !this.currentPhoto.album) return false;
     return this.currentPhoto.ratingCount > 8 && 
            Math.round(this.currentPhoto.independentScore ?? 0) >= 5 && 
-           this.currentPhoto.album.albumScore > 3.8;
+           this.currentPhoto.album.albumScore > 3.1;
   }
 
   openAlbum() {
