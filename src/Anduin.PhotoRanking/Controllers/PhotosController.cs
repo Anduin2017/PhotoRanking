@@ -1,4 +1,3 @@
-using Aiursoft.Canon;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
 using Anduin.PhotoRanking.Services;
@@ -15,7 +14,6 @@ public class PhotosController : ControllerBase
     private readonly ScoringService _scoringService;
     private readonly ILogger<PhotosController> _logger;
     private readonly ImageAnalysisService _imageAnalysis;
-    private readonly CanonPool _canonPool;
     private readonly UserPreferenceService _userPreferenceService;
 
     public PhotosController(
@@ -23,14 +21,12 @@ public class PhotosController : ControllerBase
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
         ImageAnalysisService imageAnalysis,
-        CanonPool canonPool,
         UserPreferenceService userPreferenceService)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
         _imageAnalysis = imageAnalysis;
-        _canonPool = canonPool;
         _userPreferenceService = userPreferenceService;
     }
 
