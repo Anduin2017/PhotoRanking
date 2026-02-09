@@ -16,9 +16,16 @@ public class TestStartup : IWebStartup
         // Use in-memory SQLite database with shared cache for tests
         var connectionString = "DataSource=test-db-" + Guid.NewGuid().ToString("N") + ".db";
         services.AddAiurSqliteWithCache<AppDbContext>(
-            connectionString,
+            connectionString: connectionString,
             splitQuery: false,
-            allowCache: false);
+            allowCache: false,
+            onConnectionOpen: (conn) =>
+            {
+                if (conn is Microsoft.Data.Sqlite.SqliteConnection sqliteConn)
+                {
+                    SqliteVectorFunctions.RegisterVectorDistance(sqliteConn);
+                }
+            });
 
         // Services
         services.AddMemoryCache();
@@ -28,6 +35,7 @@ public class TestStartup : IWebStartup
         services.AddScoped<ScoringService>();
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
+        services.AddScoped<UserPreferenceService>();
 
         // Controllers and localization
         services.AddControllersWithViews()

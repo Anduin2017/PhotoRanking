@@ -126,7 +126,7 @@ public class SixPointTests
             { 
                 AlbumId = "album2", 
                 Name = "Album 2",
-                AlbumScore = 3.5 
+                AlbumScore = 3.0 
             };
             context.Albums.Add(album);
             
@@ -152,7 +152,7 @@ public class SixPointTests
     public async Task TestSixPointUnlockLogic_BoundaryScore_Above()
     {
         int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.9 (Should Pass > 3.8)
+        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.2 (Should Pass > 3.1)
         using (var scope = _server!.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -161,7 +161,7 @@ public class SixPointTests
             { 
                 AlbumId = "boundary-above", 
                 Name = "Boundary Above",
-                AlbumScore = 3.9 
+                AlbumScore = 3.2 
             };
             context.Albums.Add(album);
             
@@ -187,7 +187,7 @@ public class SixPointTests
     public async Task TestSixPointUnlockLogic_BoundaryScore_Exact()
     {
         int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.8 (Should Fail not > 3.8)
+        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.1 (Should Fail not > 3.1)
         using (var scope = _server!.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -196,7 +196,7 @@ public class SixPointTests
             { 
                 AlbumId = "boundary-exact", 
                 Name = "Boundary Exact",
-                AlbumScore = 3.8 
+                AlbumScore = 3.1 
             };
             context.Albums.Add(album);
             
