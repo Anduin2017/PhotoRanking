@@ -139,14 +139,25 @@ public class ScoringService
         var ratedPhotos = album.Photos.Where(p => p.IndependentScore.HasValue).ToList();
         album.KnownRate = album.PhotoCount > 0 ? (double)ratedPhotos.Count / album.PhotoCount : 0;
 
-        // 计算相册分
+        // 计算相册分：取前20%高分照片的均值
         if (ratedPhotos.Count > 0)
         {
             var avgRated = ratedPhotos.Average(p => p.IndependentScore!.Value);
             var unratedScore = Math.Max(0, avgRated - 1); // 未打分的照片分数为 avg - 1
-            var unratedCount = album.PhotoCount - ratedPhotos.Count;
-
-            album.AlbumScore = (ratedPhotos.Sum(p => p.IndependentScore!.Value) + unratedCount * unratedScore) / album.PhotoCount;
+            
+            // 构建所有照片的分数列表（已评分用独立分，未评分用 unratedScore）
+            var allPhotoScores = new List<double>();
+            foreach (var photo in album.Photos)
+            {
+                allPhotoScores.Add(photo.IndependentScore ?? unratedScore);
+            }
+            
+            // 排序并取前20%（至少取1张）
+            var sortedScores = allPhotoScores.OrderByDescending(s => s).ToList();
+            var top20PercentCount = Math.Max(1, (int)Math.Ceiling(sortedScores.Count * 0.2));
+            var topScores = sortedScores.Take(top20PercentCount);
+            
+            album.AlbumScore = topScores.Average();
         }
         else
         {
@@ -183,10 +194,10 @@ public class ScoringService
 
         foreach (var photo in album.Photos)
         {
-            // 计算整体分：独立分和相册分的均值
+            // 计算整体分：70%独立分 + 30%相册分
             if (photo.IndependentScore.HasValue)
             {
-                photo.OverallScore = (photo.IndependentScore.Value + album.AlbumScore) / 2.0;
+                photo.OverallScore = photo.IndependentScore.Value * 0.7 + album.AlbumScore * 0.3;
             }
             else
             {

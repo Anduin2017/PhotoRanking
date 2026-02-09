@@ -49,6 +49,95 @@ The docker image has the following context:
 | Photos import | /photos                           |
 | Config path   | /data/appsettings.json          |
 
+## Core Scoring Algorithm
+
+PhotoRanking implements a sophisticated multi-layered scoring system that combines user ratings with AI-powered predictions to evaluate photo quality.
+
+### Three Core Score Types
+
+1. **Independent Score** (`IndependentScore`)
+   - Direct user rating for a single photo (0-5 scale)
+   - Represents the photo's intrinsic quality
+   - Becomes `null` if the photo has never been rated
+   - **Fixation mechanism**: If the last 3 consecutive ratings are identical, the photo is marked as `IsFixed = true` and the score is locked
+
+2. **Album Score** (`AlbumScore`)
+   - Represents the overall quality of the entire album
+   - Calculated using the **top 20% highest-scored photos** in the album
+   - **Formula**:
+     ```
+     For all photos in album:
+       - Rated photos use IndependentScore
+       - Unrated photos use unratedScore = max(0, avgRated - 1)
+     
+     Sort all photos by score (descending)
+     Take top 20% (at least 1 photo)
+     AlbumScore = average of top 20% photos
+     ```
+   - Defaults to `2.5` if no photos have been rated yet
+   - This approach emphasizes the album's best content rather than being dragged down by lower-quality photos
+
+3. **Overall Score** (`OverallScore`)
+   - The final score used for sorting and recommendations
+   - **Formula**:
+     ```
+     If photo has IndependentScore:
+       OverallScore = IndependentScore × 0.7 + AlbumScore × 0.3
+     Else:
+       OverallScore = AlbumScore
+     ```
+   - Balances individual photo quality (70%) with album context (30%)
+
+### Feedback Loop
+
+The scoring system forms a **bidirectional feedback loop**:
+
+```
+User rates photo → Updates IndependentScore
+                 ↓
+        Recalculates AlbumScore
+                 ↓
+    Updates OverallScore for ALL photos in the album
+```
+
+When you rate a photo highly, it raises the album's average, which in turn increases the overall scores of all unrated photos in that album.
+
+### AI-Powered Score Prediction
+
+For unrated photos, the system can predict scores using a **Stratified KNN (K-Nearest Neighbors) algorithm** based on image similarity:
+
+1. **Stratified Sampling**: Uses SQL window functions to select the top 20 most similar photos from each score tier (0-5), preventing bias from overrepresented high-score photos
+
+2. **Top-K Similarity Matching**: For each score tier, calculates cosine similarity between feature vectors and takes the **average of the top 3** most similar photos (not all photos), ensuring that even rare cases are properly weighted
+
+3. **Non-linear Confidence Amplification**: Applies `similarity^30` to dramatically amplify small differences in similarity (e.g., 0.80 vs 0.85 becomes a 1:10 ratio instead of 1:1)
+
+4. **SmoothStep Smoothing**: Applies Hermite interpolation to the predicted score for more natural distribution:
+   ```
+   t = rawScore / 5.0
+   smoothed = t² × (3 - 2t)
+   finalScore = smoothed × 5.0
+   ```
+   This makes predicted scores like 4.0 → 4.48, avoiding clustering at integer values
+
+### Knownness Score
+
+Beyond quality scores, each photo has a **Knownness** metric (0-100) that affects its recommendation priority:
+
+```
+If photo is fixed (last 3 ratings identical):
+  Knownness = 50 + albumKnownRate × 50
+
+Else:
+  ratingScore = min(ratingCount, 5) × 10      // Max 50 points
+  albumScore = albumKnownRate × 50             // Max 50 points
+  Knownness = ratingScore + albumScore
+```
+
+Where `albumKnownRate = ratedPhotosCount / totalPhotosCount`
+
+This encourages the system to show both under-rated photos (low knownness) and uncertain photos (not yet fixed) to the user.
+
 ## How to contribute
 
 There are many ways to contribute to the project: logging bugs, submitting pull requests, reporting issues, and creating suggestions.
