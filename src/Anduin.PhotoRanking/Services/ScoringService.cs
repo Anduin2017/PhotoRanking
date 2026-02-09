@@ -65,7 +65,7 @@ public class ScoringService
         {
             var isEligibleForSix = photo.RatingCount > 8 &&
                                   Math.Round(photo.IndependentScore ?? 0) >= 5 &&
-                                  photo.Album.AlbumScore > 3.8;
+                                  photo.Album.AlbumScore > 3.1;
             
             if (!isEligibleForSix)
             {
