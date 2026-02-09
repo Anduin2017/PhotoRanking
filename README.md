@@ -63,7 +63,7 @@ PhotoRanking implements a sophisticated multi-layered scoring system that combin
 
 2. **Album Score** (`AlbumScore`)
    - Represents the overall quality of the entire album
-   - Calculated using the **top 20% highest-scored photos** in the album
+   - Calculated using the **top 80% highest-scored photos** in the album
    - **Formula**:
      ```
      For all photos in album:
@@ -71,8 +71,8 @@ PhotoRanking implements a sophisticated multi-layered scoring system that combin
        - Unrated photos use unratedScore = max(0, avgRated - 1)
      
      Sort all photos by score (descending)
-     Take top 20% (at least 1 photo)
-     AlbumScore = average of top 20% photos
+     Take top 80% (at least 1 photo)
+     AlbumScore = average of top 80% photos
      ```
    - Defaults to `2.5` if no photos have been rated yet
    - This approach emphasizes the album's best content rather than being dragged down by lower-quality photos
