@@ -19,8 +19,7 @@
         <div class="viewer-album-info" (click)="openAlbum()" style="cursor: pointer;">
             <div class="album-info-left">
                 <div class="album-name" *ngIf="currentPhoto.album">
-                    {{ currentPhoto.album.name }}
-                    <span style="font-size: 0.8em; opacity: 0.6; margin-left: 8px; font-weight: normal;">{{ currentPhoto.albumId }}</span>
+                    {{ truncateAlbumName(currentPhoto.album.name) }}
                 </div>
                 <div class="album-score" *ngIf="currentPhoto.album">
                     相册分: <span>{{ currentPhoto.album.albumScore | number:'1.2-2' }}</span>
@@ -42,19 +41,11 @@
                 <span class="stat-badge-label">已知度</span>
                 <span class="stat-badge-value">{{ currentPhoto.knownness | number:'1.2-2' }}</span>
             </div>
-             <div class="stat-badge">
-                <span class="stat-badge-label">评分数</span>
-                <span class="stat-badge-value">{{ currentPhoto.ratingCount }}</span>
-            </div>
         </div>
 
         <div class="viewer-rating">
-            <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
+            <button class="rating-btn" *ngFor="let score of [0,1,2,3,4,5,6]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
                 {{ score }}
-            </button>
-
-            <button *ngIf="isSixUnlocked" class="rating-btn" (click)="ratePhoto(6, $event)" [class.last-rated]="isRated(6)">
-                6
             </button>
 
             <button class="rating-btn" (click)="guessScore($event)" [disabled]="isGuessing" title="猜测独立分" style="min-width: 48px; width: auto; padding: 0 4px; position: relative; overflow: hidden;">

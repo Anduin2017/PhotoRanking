@@ -63,13 +63,26 @@ public class ScoringService
         // 验证打 6 分的条件
         if (score == 6)
         {
-            var isEligibleForSix = photo.RatingCount > 8 &&
-                                  Math.Round(photo.IndependentScore ?? 0) >= 5 &&
-                                  photo.Album.AlbumScore > 3.1;
+            var sixPointPhotosInAlbum = await _context.Photos
+                .CountAsync(p => p.AlbumId == photo.AlbumId && p.IndependentScore >= 5.5);
+
+            var isEligibleForSix = photo.RatingCount >= 8 &&
+                                  (photo.IndependentScore ?? 0) >= 5 &&
+                                  photo.Album.AlbumScore >= 3.0 &&
+                                  sixPointPhotosInAlbum < 3;
             
             if (!isEligibleForSix)
             {
-                throw new InvalidOperationException("This photo is not eligible for a 6-point rating yet.");
+                if (photo.RatingCount < 8)
+                    throw new InvalidOperationException("打分次数不足 8 次，无法评 6 分。");
+                if ((photo.IndependentScore ?? 0) < 5)
+                    throw new InvalidOperationException("最后一次得分不足 5 分，无法评 6 分。");
+                if (photo.Album.AlbumScore < 3.0)
+                    throw new InvalidOperationException("相册分不足 3.0，无法评 6 分。");
+                if (sixPointPhotosInAlbum >= 3)
+                    throw new InvalidOperationException("同一个相册不得超过 3 张 6 分图。");
+                
+                throw new InvalidOperationException("该照片目前不符合评 6 分的条件。");
             }
         }
 
