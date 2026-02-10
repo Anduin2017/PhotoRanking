@@ -73,7 +73,69 @@
 .discover-item-score {
     color: white;
     font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.target-photo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 3rem;
+}
+
+.target-photo-card {
+    position: relative;
+    max-width: 400px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    border: 2px solid var(--primary);
+}
+
+.target-photo-card:hover {
+    transform: scale(1.02);
+}
+
+.target-photo-img {
+    width: 100%;
+    height: auto;
+    max-height: 500px;
+    object-fit: contain;
+    display: block;
+}
+
+.target-photo-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: var(--primary);
+    color: white;
+    padding: 0.2rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    z-index: 1;
+}
+
+.target-photo-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+    padding: 1.5rem 1rem 0.5rem;
+    color: white;
+}
+
+.target-photo-id {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.target-photo-score {
     font-size: 1.1rem;
+    font-weight: bold;
 }
 
 .loading-indicator {

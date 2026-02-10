@@ -72,5 +72,8 @@ public class Photo
     /// </summary>
     public byte[]? FeatureVector { get; set; }
 
+    [NotMapped]
+    public double? Similarity { get; set; }
+
     public DateTime LastModified { get; set; } = DateTime.UtcNow;
 }

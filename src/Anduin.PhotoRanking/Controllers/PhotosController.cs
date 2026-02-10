@@ -297,6 +297,16 @@ public class PhotosController : ControllerBase
             .Include(p => p.Album)
             .ToListAsync();
 
+        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vector);
+        foreach (var photo in similarPhotos)
+        {
+            if (photo.FeatureVector != null)
+            {
+                var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector);
+                photo.Similarity = Math.Max(0, ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector));
+            }
+        }
+
         return Ok(similarPhotos);
     }
 
@@ -358,6 +368,16 @@ public class PhotosController : ControllerBase
                     LIMIT {take}")
                 .Include(p => p.Album)
                 .ToListAsync();
+
+            var targetVector = ImageAnalysisService.ByteArrayToFloatArray(vectorBytes);
+            foreach (var photo in similarPhotos)
+            {
+                if (photo.FeatureVector != null)
+                {
+                    var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector);
+                    photo.Similarity = Math.Max(0, ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector));
+                }
+            }
 
             return Ok(similarPhotos);
         }

@@ -13,6 +13,7 @@ import { PhotoViewerComponent } from '../photo-viewer/photo-viewer';
 })
 export class SimilarComponent implements OnInit {
   targetId: number = 0;
+  targetPhoto: Photo | null = null;
   photos: Photo[] = [];
   isLoading = true;
   isLoadingMore = false;
@@ -39,7 +40,19 @@ export class SimilarComponent implements OnInit {
     this.skip = 0;
     this.hasMore = true;
     this.isLoading = true;
+    this.loadTargetPhoto();
     this.loadMore();
+  }
+
+  loadTargetPhoto() {
+    this.photoService.getPhoto(this.targetId).subscribe({
+      next: (photo) => {
+        this.targetPhoto = photo;
+      },
+      error: (err) => {
+        console.error('Error loading target photo', err);
+      }
+    });
   }
 
   loadMore() {
@@ -79,5 +92,15 @@ export class SimilarComponent implements OnInit {
   closeViewer() {
     this.viewerOpen = false;
     this.initialPhotoId = null;
+  }
+
+  get viewerPhotos(): Photo[] {
+    if (this.targetPhoto) {
+      const exists = this.photos.some(p => p.id === this.targetPhoto!.id);
+      if (!exists) {
+        return [this.targetPhoto, ...this.photos];
+      }
+    }
+    return this.photos;
   }
 }
