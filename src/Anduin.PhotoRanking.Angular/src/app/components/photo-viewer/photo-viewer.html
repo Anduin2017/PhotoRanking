@@ -15,6 +15,21 @@
         </svg>
     </button>
 
+    <div class="mini-score-box" 
+         [class.hidden]="showInfo" 
+         [class.rated]="currentPhoto.independentScore != null || guessedScore != null"
+         *ngIf="currentPhoto" 
+         (click)="onMiniBoxClick($event)">
+        <ng-container *ngIf="currentPhoto.independentScore != null; else guessTpl">
+            {{ currentPhoto.independentScore | number:'1.2-2' }}
+        </ng-container>
+        <ng-template #guessTpl>
+            <span *ngIf="!isGuessing && guessedScore === null">?</span>
+            <span *ngIf="isGuessing">...</span>
+            <span *ngIf="!isGuessing && guessedScore !== null">{{ guessedScore | number:'1.2-2' }}</span>
+        </ng-template>
+    </div>
+
     <div class="viewer-info" [class.hidden]="!showInfo" *ngIf="currentPhoto" (click)="$event.stopPropagation()">
         <div class="viewer-album-info" (click)="openAlbum()" style="cursor: pointer;">
             <div class="album-info-left">
