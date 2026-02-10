@@ -117,7 +117,7 @@ public class SixPointTests
     public async Task TestSixPointLockLogic_LowAlbumScore()
     {
         int photoId;
-        // 1. Seed data: Photo with 10 ratings, score 5, album score 3.5
+        // 1. Seed data: Photo with 10 ratings, score 5, album score 2.9 (Should Fail < 3.0)
         using (var scope = _server!.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -126,7 +126,7 @@ public class SixPointTests
             { 
                 AlbumId = "album2", 
                 Name = "Album 2",
-                AlbumScore = 3.0 
+                AlbumScore = 2.9 
             };
             context.Albums.Add(album);
             
@@ -152,7 +152,7 @@ public class SixPointTests
     public async Task TestSixPointUnlockLogic_BoundaryScore_Above()
     {
         int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.2 (Should Pass > 3.1)
+        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.0 (Should Pass >= 3.0)
         using (var scope = _server!.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -161,7 +161,7 @@ public class SixPointTests
             { 
                 AlbumId = "boundary-above", 
                 Name = "Boundary Above",
-                AlbumScore = 3.2 
+                AlbumScore = 3.0 
             };
             context.Albums.Add(album);
             
@@ -187,7 +187,7 @@ public class SixPointTests
     public async Task TestSixPointUnlockLogic_BoundaryScore_Exact()
     {
         int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.1 (Should Fail not > 3.1)
+        // 1. Seed data: Photo with 9 ratings, score 5, album score 2.9 (Should Fail < 3.0)
         using (var scope = _server!.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -196,7 +196,7 @@ public class SixPointTests
             { 
                 AlbumId = "boundary-exact", 
                 Name = "Boundary Exact",
-                AlbumScore = 3.1 
+                AlbumScore = 2.9 
             };
             context.Albums.Add(album);
             
@@ -216,5 +216,55 @@ public class SixPointTests
         // 2. Try to rate 6
         var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task TestSixPointLockLogic_ThreePhotosLimit()
+    {
+        int photoId;
+        // 1. Seed data: Album with 3 photos already rated 6
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            
+            var album = new Album 
+            { 
+                AlbumId = "full-album", 
+                Name = "Full Album",
+                AlbumScore = 5.0 
+            };
+            context.Albums.Add(album);
+
+            for (int i = 0; i < 3; i++)
+            {
+                context.Photos.Add(new Photo 
+                { 
+                    FilePath = $"six_{i}.jpg", 
+                    AlbumId = "full-album", 
+                    IndependentScore = 6.0, 
+                    RatingCount = 10 
+                });
+            }
+            
+            var targetPhoto = new Photo 
+            { 
+                FilePath = "target.jpg", 
+                AlbumId = "full-album", 
+                IndependentScore = 5.0, 
+                RatingCount = 10 
+            };
+            context.Photos.Add(targetPhoto);
+            await context.SaveChangesAsync();
+            photoId = targetPhoto.Id;
+        }
+
+        // 2. Try to rate 6
+        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        
+        var error = await response.Content.ReadFromJsonAsync<dynamic>();
+        Assert.IsNotNull(error);
+        // The dynamic error object from BadRequest(new { error = ex.Message })
+        // will be { "error": "..." }
     }
 }

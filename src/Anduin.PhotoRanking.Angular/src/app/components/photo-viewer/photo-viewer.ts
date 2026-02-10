@@ -234,7 +234,14 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
           this.photos[index] = { ...this.photos[index], ...updatedPhoto };
         }
       },
-      error: (err) => console.error(err)
+      error: (err) => {
+        console.error(err);
+        if (err.error && err.error.error) {
+          alert(err.error.error);
+        } else {
+          alert('打分失败，请稍后重试。');
+        }
+      }
     });
   }
 
@@ -245,15 +252,14 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     return Math.round(this.currentPhoto.independentScore) === score;
   }
 
-  get isSixUnlocked(): boolean {
-    if (!this.currentPhoto || !this.currentPhoto.album) return false;
-    return this.currentPhoto.ratingCount > 8 && 
-           Math.round(this.currentPhoto.independentScore ?? 0) >= 5 && 
-           this.currentPhoto.album.albumScore > 3.1;
+  truncateAlbumName(name: string): string {
+    if (!name) return '';
+    if (name.length <= 20) return name;
+    return name.substring(0, 17) + '...';
   }
 
   openAlbum() {
-    if (this.currentPhoto) {
+    if (this.showInfo && this.currentPhoto) {
       this.onClose();
       this.router.navigate(['/album', this.currentPhoto.albumId]);
     }
@@ -289,8 +295,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
       this.onClose();
     } else if (event.key >= '0' && event.key <= '5') {
       this.ratePhoto(parseInt(event.key));
-    } else if (event.key === '6' && this.isSixUnlocked) {
+    } else if (event.key === '6') {
       this.ratePhoto(6);
+    } else if (event.key === '/') {
+      this.guessScore();
     }
   }
 }
