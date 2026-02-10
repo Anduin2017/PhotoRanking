@@ -156,6 +156,13 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.close.emit();
   }
 
+  onMiniBoxClick(event: Event) {
+    event.stopPropagation();
+    if (this.currentPhoto && this.currentPhoto.independentScore == null && this.guessedScore === null && !this.isGuessing) {
+      this.guessScore();
+    }
+  }
+
   // Slideshow methods
   togglePlay(event?: Event) {
     if (event) event.stopPropagation();
