@@ -31,6 +31,7 @@ export interface Photo {
   ratingCount: number;
   viewCount: number;
   similarity?: number;
+  estimatedScore?: number;
   createdAt: string;
 }
 

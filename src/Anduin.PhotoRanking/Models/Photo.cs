@@ -75,5 +75,8 @@ public class Photo
     [NotMapped]
     public double? Similarity { get; set; }
 
+    [NotMapped]
+    public double? EstimatedScore { get; set; }
+
     public DateTime LastModified { get; set; } = DateTime.UtcNow;
 }
