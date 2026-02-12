@@ -1,4 +1,6 @@
 using Anduin.PhotoRanking.Data;
+using Anduin.PhotoRanking.Models;
+using Anduin.PhotoRanking.Services;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,10 +12,12 @@ namespace Anduin.PhotoRanking.Controllers;
 public class AlbumsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly ScoringService _scoringService;
 
-    public AlbumsController(AppDbContext context)
+    public AlbumsController(AppDbContext context, ScoringService scoringService)
     {
         _context = context;
+        _scoringService = scoringService;
     }
 
     /// <summary>
@@ -61,15 +65,24 @@ public class AlbumsController : ControllerBase
         }
 
         // 根据sortBy参数排序
-        var photos = album.Photos.AsEnumerable();
-        photos = sortBy.ToLower() switch
+        var photosList = album.Photos.ToList();
+        IEnumerable<Photo> photos = photosList;
+        if (sortBy.ToLower() == "estimatedscore")
         {
-            "score" or "overallscore" => photos.OrderByDescending(p => p.OverallScore),
-            "rated" => photos.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
-            "unrated" => photos.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
-            "independentscore" => photos.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
-            _ => photos.OrderBy(p => p.FilePath)
-        };
+            await _scoringService.BatchGuessScoresInternal(photosList);
+            photos = photosList.OrderByDescending(p => p.EstimatedScore).ThenBy(p => p.FilePath);
+        }
+        else
+        {
+            photos = sortBy.ToLower() switch
+            {
+                "score" or "overallscore" => photos.OrderByDescending(p => p.OverallScore),
+                "rated" => photos.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
+                "unrated" => photos.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
+                "independentscore" => photos.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
+                _ => photos.OrderBy(p => p.FilePath)
+            };
+        }
 
         return Ok(new
         {
@@ -95,6 +108,19 @@ public class AlbumsController : ControllerBase
         }
 
         var query = _context.Photos.Where(p => p.AlbumId == albumId);
+
+        if (sortBy.ToLower() == "estimatedscore")
+        {
+            var allPhotos = await query.ToListAsync();
+            await _scoringService.BatchGuessScoresInternal(allPhotos);
+            var sortedPhotos = allPhotos
+                .OrderByDescending(p => p.EstimatedScore)
+                .ThenBy(p => p.FilePath)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+            return Ok(sortedPhotos);
+        }
 
         // 根据sortBy参数排序
         query = sortBy.ToLower() switch

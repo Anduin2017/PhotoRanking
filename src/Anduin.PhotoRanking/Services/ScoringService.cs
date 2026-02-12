@@ -283,7 +283,7 @@ public class ScoringService
     /// <summary>
     /// 猜测单张照片的分数（使用分层KNN平衡算法 + SmoothStep 平滑）
     /// </summary>
-    public async Task<int> GuessScoreInternal(Photo targetPhoto)
+    public async Task<double> GuessScoreInternal(Photo targetPhoto)
     {
         var vector = await EnsureFeatureVectorPublic(targetPhoto);
         if (vector == null)
@@ -292,7 +292,81 @@ public class ScoringService
         }
 
         var result = await GuessScoreBalancedInternal(targetPhoto, vector);
-        return (int)Math.Round(result.PredictedScore);
+        return result.PredictedScore;
+    }
+
+    /// <summary>
+    /// 批量猜测照片分数（优化性能）
+    /// </summary>
+    public async Task BatchGuessScoresInternal(List<Photo> targetPhotos)
+    {
+        // 1. 确保所有照片都有特征向量
+        foreach (var photo in targetPhotos)
+        {
+            await EnsureFeatureVectorPublic(photo);
+        }
+
+        // 2. 获取所有已评分照片的向量和分数
+        var ratedPhotos = await _context.Photos
+            .Where(p => p.FeatureVector != null && p.IndependentScore != null)
+            .AsNoTracking()
+            .Select(p => new { p.IndependentScore, p.FeatureVector })
+            .ToListAsync();
+
+        if (ratedPhotos.Count == 0) return;
+
+        // 3. 将已评分照片按分数分组
+        var ratedGroups = ratedPhotos
+            .GroupBy(p => (int)Math.Round(p.IndependentScore!.Value))
+            .ToDictionary(
+                g => g.Key, 
+                g => g.Select(p => ImageAnalysisService.ByteArrayToFloatArray(p.FeatureVector!)).ToList()
+            );
+
+        // 4. 对每张目标照片进行预测
+        foreach (var targetPhoto in targetPhotos)
+        {
+            if (targetPhoto.FeatureVector == null)
+            {
+                targetPhoto.EstimatedScore = 0;
+                continue;
+            }
+
+            var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetPhoto.FeatureVector);
+            var scoreConfidences = new Dictionary<int, double>();
+
+            for (int i = 0; i <= 6; i++)
+            {
+                if (!ratedGroups.ContainsKey(i))
+                {
+                    scoreConfidences[i] = 0;
+                    continue;
+                }
+
+                var groupVectors = ratedGroups[i];
+                var similarities = new List<double>();
+                foreach (var photoVector in groupVectors)
+                {
+                    var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
+                    similarities.Add(Math.Max(0, similarity));
+                }
+
+                var bestMatchSimilarity = similarities.OrderByDescending(x => x).Take(3).Average();
+                scoreConfidences[i] = Math.Pow(bestMatchSimilarity, 30);
+            }
+
+            double totalWeight = scoreConfidences.Values.Sum();
+            if (totalWeight == 0)
+            {
+                targetPhoto.EstimatedScore = 0;
+            }
+            else
+            {
+                double weightedSum = scoreConfidences.Sum(x => x.Key * x.Value);
+                var rawPredictedScore = weightedSum / totalWeight;
+                targetPhoto.EstimatedScore = ApplySmoothStep(rawPredictedScore);
+            }
+        }
     }
 
     /// <summary>

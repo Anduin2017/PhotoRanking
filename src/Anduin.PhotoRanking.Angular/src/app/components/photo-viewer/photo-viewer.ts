@@ -123,6 +123,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.guessedScore = null;
     this.photoService.getPhoto(photoId).subscribe(photo => {
       this.currentPhoto = photo;
+      const localPhoto = this.photos.find(p => p.id === photoId);
+      if (localPhoto && localPhoto.estimatedScore) {
+        this.guessedScore = localPhoto.estimatedScore;
+      }
     });
 
     this.photoService.viewPhoto(photoId).subscribe();

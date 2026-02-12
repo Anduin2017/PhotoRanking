@@ -34,6 +34,7 @@
                 <option value="filename">文件名</option>
                 <option value="overallscore">整体分排序</option>
                 <option value="independentscore">独立分排序</option>
+                <option value="estimatedscore">按推测分排序</option>
                 <option value="rated">已打分优先</option>
                 <option value="unrated">未打分优先</option>
             </select>
@@ -45,7 +46,14 @@
         <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
             <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
             <div class="discover-item-overlay">
-                <div class="discover-item-score">分数: {{ photo.overallScore | number:'1.2-2' }}</div>
+                <div class="discover-item-score">
+                    <ng-container *ngIf="sortBy === 'estimatedscore' && photo.estimatedScore">
+                        推测: {{ photo.estimatedScore | number:'1.2-2' }}
+                    </ng-container>
+                    <ng-container *ngIf="sortBy !== 'estimatedscore' || !photo.estimatedScore">
+                        分数: {{ photo.overallScore | number:'1.2-2' }}
+                    </ng-container>
+                </div>
             </div>
         </div>
     </div>
