@@ -1,9 +1,5 @@
-using System.Net;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using static Aiursoft.WebTools.Extends;
@@ -45,7 +41,14 @@ public class RatingHistoryTests
         var testDbFiles = Directory.GetFiles(".", "test-db-*.db*");
         foreach (var file in testDbFiles)
         {
-            try { File.Delete(file); } catch { }
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
         }
     }
 
