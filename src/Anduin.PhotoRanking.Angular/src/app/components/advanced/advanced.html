@@ -153,7 +153,7 @@
         <div class="stat-section">
             <h2 class="stat-section-title">整体分最高的照片</h2>
             <div class="photo-grid">
-                <div *ngFor="let photo of stats.topPhotosByScore" class="photo-grid-item" (click)="openViewer(photo.id)">
+                <div *ngFor="let photo of stats.topPhotosByScore" class="photo-grid-item" (click)="openViewer(photo.id, stats.topPhotosByScore)">
                     <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
                 </div>
             </div>
@@ -166,7 +166,7 @@
         <div class="stat-section">
             <h2 class="stat-section-title">已知性最高的照片</h2>
             <div class="photo-grid">
-                <div *ngFor="let photo of stats.topPhotosByKnownness" class="photo-grid-item" (click)="openViewer(photo.id)">
+                <div *ngFor="let photo of stats.topPhotosByKnownness" class="photo-grid-item" (click)="openViewer(photo.id, stats.topPhotosByKnownness)">
                     <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
                 </div>
             </div>
@@ -174,5 +174,21 @@
                 <button class="load-more-btn" (click)="loadMore('photoKnownness')">Load More</button>
             </div>
         </div>
+
+        <!-- 5. Rating History -->
+        <div class="stat-section">
+            <h2 class="stat-section-title">打分历史</h2>
+            <div class="photo-grid">
+                <div *ngFor="let photo of stats.ratingHistory" class="photo-grid-item" (click)="openViewer(photo.id, stats.ratingHistory)">
+                    <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
+                </div>
+            </div>
+            <div class="load-more-container">
+                <button class="load-more-btn" (click)="loadMore('ratingHistory')">Load More</button>
+            </div>
+        </div>
     </div>
+
+    <app-photo-viewer *ngIf="viewerOpen && initialPhotoId" [startPhotoId]="initialPhotoId" [photos]="viewerPhotos"
+        (close)="closeViewer()"></app-photo-viewer>
 </div>

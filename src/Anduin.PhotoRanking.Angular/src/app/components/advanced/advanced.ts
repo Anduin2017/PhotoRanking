@@ -2,11 +2,12 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PhotoService, GlobalStats } from '../../services/photo';
 import { Router } from '@angular/router';
+import { PhotoViewerComponent } from '../photo-viewer/photo-viewer';
 
 @Component({
   selector: 'app-advanced',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, PhotoViewerComponent],
   templateUrl: './advanced.html',
   styleUrl: './advanced.css',
 })
@@ -16,7 +17,8 @@ export class AdvancedComponent implements OnInit {
     topAlbumsByScore: [],
     topAlbumsByKnownRate: [],
     topPhotosByScore: [],
-    topPhotosByKnownness: []
+    topPhotosByKnownness: [],
+    ratingHistory: []
   };
   globalStats: GlobalStats | null = null;
 
@@ -24,8 +26,13 @@ export class AdvancedComponent implements OnInit {
     albumScore: 10,
     albumKnownRate: 10,
     photoScore: 20,
-    photoKnownness: 20
+    photoKnownness: 20,
+    ratingHistory: 20
   };
+
+  viewerOpen = false;
+  initialPhotoId: number | null = null;
+  viewerPhotos: any[] = [];
 
   constructor(public photoService: PhotoService, private router: Router) { }
 
@@ -46,6 +53,7 @@ export class AdvancedComponent implements OnInit {
         this.loadedCounts.albumKnownRate = data.topAlbumsByKnownRate?.length || 0;
         this.loadedCounts.photoScore = data.topPhotosByScore?.length || 0;
         this.loadedCounts.photoKnownness = data.topPhotosByKnownness?.length || 0;
+        this.loadedCounts.ratingHistory = data.ratingHistory?.length || 0;
       },
       error: (err) => {
         console.error('Error loading stats', err);
@@ -57,7 +65,7 @@ export class AdvancedComponent implements OnInit {
   loadMore(section: string) {
     let endpoint = '';
     let skip = 0;
-    const take = 10;
+    const take = 20;
 
     switch (section) {
       case 'albumScore':
@@ -75,6 +83,10 @@ export class AdvancedComponent implements OnInit {
       case 'photoKnownness':
         skip = this.loadedCounts.photoKnownness;
         endpoint = `photos/top-by-knownness?skip=${skip}&take=${take}`;
+        break;
+      case 'ratingHistory':
+        skip = this.loadedCounts.ratingHistory;
+        endpoint = `photos/rating-history?skip=${skip}&take=${take}`;
         break;
     }
 
@@ -94,6 +106,9 @@ export class AdvancedComponent implements OnInit {
         } else if (section === 'photoKnownness') {
           this.stats.topPhotosByKnownness = [...this.stats.topPhotosByKnownness, ...items];
           this.loadedCounts.photoKnownness += items.length;
+        } else if (section === 'ratingHistory') {
+          this.stats.ratingHistory = [...this.stats.ratingHistory, ...items];
+          this.loadedCounts.ratingHistory += items.length;
         }
       },
       error: (err) => console.error(`Error loading more ${section}`, err)
@@ -105,8 +120,15 @@ export class AdvancedComponent implements OnInit {
   }
 
   // Open viewer helper
-  openViewer(photoId: number) {
-    // TODO: Implement photo viewer opening
-    console.log('Open photo', photoId);
+  openViewer(photoId: number, photos: any[]) {
+    this.viewerPhotos = photos;
+    this.initialPhotoId = photoId;
+    this.viewerOpen = true;
+  }
+
+  closeViewer() {
+    this.viewerOpen = false;
+    this.initialPhotoId = null;
+    this.viewerPhotos = [];
   }
 }
