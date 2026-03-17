@@ -416,6 +416,13 @@ public class PhotosController : ControllerBase
             .Take(20)
             .ToListAsync();
 
+        var ratingHistory = await _context.Photos
+            .Include(p => p.Album)
+            .Where(p => p.LastRatedAt != null)
+            .OrderByDescending(p => p.LastRatedAt)
+            .Take(20)
+            .ToListAsync();
+
         // 为每个相册添加代表性照片（独立分最高的照片）
         var albumsWithThumbnails = new List<dynamic>();
 
@@ -478,7 +485,8 @@ public class PhotosController : ControllerBase
             TopAlbumsByKnownRate = albumsWithThumbnails,
             TopAlbumsByScore = albumsByScoreWithThumbnails,
             TopPhotosByKnownness = topPhotosByKnownness,
-            TopPhotosByScore = topPhotosByScore
+            TopPhotosByScore = topPhotosByScore,
+            RatingHistory = ratingHistory
         });
     }
 
@@ -507,6 +515,25 @@ public class PhotosController : ControllerBase
         var photos = await _context.Photos
             .Include(p => p.Album)
             .OrderByDescending(p => p.Knownness)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return Ok(photos);
+    }
+
+    /// <summary>
+    /// 获取打分历史（按最后打分时间逆序，照片去重）
+    /// </summary>
+    [HttpGet("rating-history")]
+    public async Task<ActionResult<List<Photo>>> GetRatingHistory(
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 20)
+    {
+        var photos = await _context.Photos
+            .Include(p => p.Album)
+            .Where(p => p.LastRatedAt != null)
+            .OrderByDescending(p => p.LastRatedAt)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
