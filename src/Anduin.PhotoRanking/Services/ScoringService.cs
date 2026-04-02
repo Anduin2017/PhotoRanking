@@ -122,6 +122,9 @@ public class ScoringService
 
         await _context.SaveChangesAsync();
 
+        // 更新全局打分时间水印
+        await UpdateLastRatingAtAsync();
+
         // 更新相册统计
         await UpdateAlbumScoresAsync(photo.AlbumId);
 
@@ -147,6 +150,18 @@ public class ScoringService
             photo.ViewCount++;
             await _context.SaveChangesAsync();
         }
+    }
+
+    private async Task UpdateLastRatingAtAsync()
+    {
+        var state = await _context.SystemStates.FirstOrDefaultAsync();
+        if (state == null)
+        {
+            state = new SystemState();
+            _context.SystemStates.Add(state);
+        }
+        state.LastRatingAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>
@@ -366,7 +381,10 @@ public class ScoringService
                 var rawPredictedScore = weightedSum / totalWeight;
                 targetPhoto.EstimatedScore = ApplySmoothStep(rawPredictedScore);
             }
+            targetPhoto.EstimatedScoreUpdatedAt = DateTime.UtcNow;
         }
+
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>

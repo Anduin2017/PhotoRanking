@@ -1,6 +1,5 @@
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
-using Anduin.PhotoRanking.Services;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +11,10 @@ namespace Anduin.PhotoRanking.Controllers;
 public class AlbumsController : ControllerBase
 {
     private readonly AppDbContext _context;
-    private readonly ScoringService _scoringService;
 
-    public AlbumsController(AppDbContext context, ScoringService scoringService)
+    public AlbumsController(AppDbContext context)
     {
         _context = context;
-        _scoringService = scoringService;
     }
 
     /// <summary>
@@ -69,8 +66,7 @@ public class AlbumsController : ControllerBase
         IEnumerable<Photo> photos = photosList;
         if (sortBy.ToLower() == "estimatedscore")
         {
-            await _scoringService.BatchGuessScoresInternal(photosList);
-            photos = photosList.OrderByDescending(p => p.EstimatedScore).ThenBy(p => p.FilePath);
+            photos = photosList.OrderByDescending(p => p.EstimatedScore ?? -1).ThenBy(p => p.FilePath);
         }
         else
         {
@@ -109,22 +105,10 @@ public class AlbumsController : ControllerBase
 
         var query = _context.Photos.Where(p => p.AlbumId == albumId);
 
-        if (sortBy.ToLower() == "estimatedscore")
-        {
-            var allPhotos = await query.ToListAsync();
-            await _scoringService.BatchGuessScoresInternal(allPhotos);
-            var sortedPhotos = allPhotos
-                .OrderByDescending(p => p.EstimatedScore)
-                .ThenBy(p => p.FilePath)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-            return Ok(sortedPhotos);
-        }
-
         // 根据sortBy参数排序
         query = sortBy.ToLower() switch
         {
+            "estimatedscore" => query.OrderByDescending(p => p.EstimatedScore).ThenBy(p => p.FilePath),
             "independentscore" => query.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
             "overallscore" => query.OrderByDescending(p => p.OverallScore),
             "knownness" => query.OrderByDescending(p => p.Knownness),

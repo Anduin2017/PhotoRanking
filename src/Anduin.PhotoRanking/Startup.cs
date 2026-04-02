@@ -39,6 +39,8 @@ public class Startup : IWebStartup
         services.AddScoped<ImageAnalysisService>();
         services.AddScoped<UserPreferenceService>();
 
+        services.AddHostedService<PredictorBackgroundService>();
+
         // Controllers and localization
         services.AddControllersWithViews()
             .AddNewtonsoftJson(options =>

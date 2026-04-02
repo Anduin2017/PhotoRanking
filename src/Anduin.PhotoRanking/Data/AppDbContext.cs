@@ -9,6 +9,7 @@ public class  AppDbContext(DbContextOptions options) : DbContext(options), ICanM
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<Album> Albums => Set<Album>();
     public DbSet<RatingLog> RatingLogs => Set<RatingLog>();
+    public DbSet<SystemState> SystemStates => Set<SystemState>();
 
     public Task MigrateAsync(CancellationToken cancellationToken)
     {
