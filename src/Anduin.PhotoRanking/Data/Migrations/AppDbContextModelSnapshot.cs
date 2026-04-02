@@ -116,6 +116,10 @@ namespace Anduin.PhotoRanking.Data.Migrations
 
                     b.HasIndex("AlbumId");
 
+                    b.HasIndex("EstimatedScore");
+
+                    b.HasIndex("IndependentScore");
+
                     b.ToTable("Photos");
                 });
 

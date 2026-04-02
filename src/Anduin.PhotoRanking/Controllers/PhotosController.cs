@@ -14,58 +14,51 @@ public class PhotosController : ControllerBase
     private readonly ScoringService _scoringService;
     private readonly ILogger<PhotosController> _logger;
     private readonly ImageAnalysisService _imageAnalysis;
-    private readonly UserPreferenceService _userPreferenceService;
 
     public PhotosController(
         AppDbContext context, 
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
-        ImageAnalysisService imageAnalysis,
-        UserPreferenceService userPreferenceService)
+        ImageAnalysisService imageAnalysis)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
         _imageAnalysis = imageAnalysis;
-        _userPreferenceService = userPreferenceService;
     }
 
     /// <summary>
-    /// 获取首页照片流（基于用户倾向向量的推荐）
+    /// 获取首页照片流（基于推测分的高质量推荐）
+    /// 策略：从库中选出推测分最高的前 200 张未评分照片，随机打乱后返回。
     /// </summary>
     [HttpGet("feed")]
     public async Task<ActionResult<List<Photo>>> GetFeed(
-        [FromQuery] int skip = 0,
         [FromQuery] int take = 20)
     {
-        // 1. 获取用户倾向向量
-        var preferenceVector = await _userPreferenceService.GetUserPreferenceVectorAsync();
+        // 1. 获取推测分最高的前 200 张未评分照片
+        var topCandidates = await _context.Photos
+            .Include(p => p.Album)
+            .Where(p => p.IndependentScore == null)
+            .OrderByDescending(p => p.EstimatedScore)
+            .Take(200)
+            .ToListAsync();
 
-        if (preferenceVector == null)
+        if (topCandidates.Count == 0)
         {
-            // Fallback to random if no vector available (e.g. not enough data)
-            var randomPhotos = await _context.Photos
+            // 如果没有带推测分的，退化为纯随机
+            return await _context.Photos
                 .Include(p => p.Album)
                 .Where(p => p.IndependentScore == null)
                 .OrderBy(p => EF.Functions.Random())
-                .Skip(skip)
                 .Take(take)
                 .ToListAsync();
-            return Ok(randomPhotos);
         }
 
-        // 2. 基于向量距离排序获取未评分照片
-        // 注意：这里直接在数据库做向量搜索
-        var recommendedPhotos = await _context.Photos
-            .FromSqlInterpolated($@"
-                SELECT * FROM Photos 
-                WHERE IndependentScore IS NULL AND FeatureVector IS NOT NULL
-                ORDER BY VectorDistance(FeatureVector, {preferenceVector}) ASC
-                LIMIT {take} OFFSET {skip}")
-            .Include(p => p.Album)
-            .ToListAsync();
+        // 2. 内存随机打乱
+        var shuffled = topCandidates.OrderBy(_ => Random.Shared.Next()).ToList();
 
-        return Ok(recommendedPhotos);
+        // 3. 返回请求的数量
+        return Ok(shuffled.Take(take).ToList());
     }
 
     /// <summary>

@@ -11,6 +11,13 @@ public class  AppDbContext(DbContextOptions options) : DbContext(options), ICanM
     public DbSet<RatingLog> RatingLogs => Set<RatingLog>();
     public DbSet<SystemState> SystemStates => Set<SystemState>();
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<Photo>().HasIndex(p => p.EstimatedScore);
+        modelBuilder.Entity<Photo>().HasIndex(p => p.IndependentScore);
+    }
+
     public Task MigrateAsync(CancellationToken cancellationToken)
     {
         return Database.MigrateAsync(cancellationToken);
