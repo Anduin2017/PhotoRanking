@@ -318,8 +318,10 @@ public class ScoringService
         // 1. 确保所有照片都有特征向量
         foreach (var photo in targetPhotos)
         {
-            await EnsureFeatureVectorPublic(photo);
+            await EnsureFeatureVectorPublic(photo, save: false);
         }
+
+        await _context.SaveChangesAsync();
 
         // 2. 获取所有已评分照片的向量和分数
         var ratedPhotos = await _context.Photos
@@ -328,7 +330,17 @@ public class ScoringService
             .Select(p => new { p.IndependentScore, p.FeatureVector })
             .ToListAsync();
 
-        if (ratedPhotos.Count == 0) return;
+        if (ratedPhotos.Count == 0)
+        {
+            // 如果库里没有任何已评分照片，无法预测
+            foreach (var targetPhoto in targetPhotos)
+            {
+                targetPhoto.EstimatedScore = 0;
+                targetPhoto.EstimatedScoreUpdatedAt = DateTime.UtcNow;
+            }
+            await _context.SaveChangesAsync();
+            return;
+        }
 
         // 3. 将已评分照片按分数分组
         var ratedGroups = ratedPhotos
@@ -341,6 +353,8 @@ public class ScoringService
         // 4. 对每张目标照片进行预测
         foreach (var targetPhoto in targetPhotos)
         {
+            targetPhoto.EstimatedScoreUpdatedAt = DateTime.UtcNow;
+
             if (targetPhoto.FeatureVector == null)
             {
                 targetPhoto.EstimatedScore = 0;
@@ -381,7 +395,6 @@ public class ScoringService
                 var rawPredictedScore = weightedSum / totalWeight;
                 targetPhoto.EstimatedScore = ApplySmoothStep(rawPredictedScore);
             }
-            targetPhoto.EstimatedScoreUpdatedAt = DateTime.UtcNow;
         }
 
         await _context.SaveChangesAsync();
@@ -479,7 +492,7 @@ public class ScoringService
     /// <summary>
     /// 确保照片有特征向量，如果没有则生成（公共方法）
     /// </summary>
-    public async Task<byte[]?> EnsureFeatureVectorPublic(Photo targetPhoto)
+    public async Task<byte[]?> EnsureFeatureVectorPublic(Photo targetPhoto, bool save = true)
     {
         // Lazy generation if vector is missing
         if (targetPhoto.FeatureVector == null)
@@ -502,7 +515,10 @@ public class ScoringService
                 if (vector != null)
                 {
                     targetPhoto.FeatureVector = vector;
-                    await _context.SaveChangesAsync();
+                    if (save)
+                    {
+                        await _context.SaveChangesAsync();
+                    }
                     return vector;
                 }
             }
