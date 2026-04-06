@@ -28,7 +28,13 @@
 
     <!-- Album Actions -->
     <div class="album-actions">
-        <div class="sort-control">
+        <div class="dedup-control" style="margin-right: 15px; display: inline-flex; align-items: center; gap: 5px;">
+            <span class="sort-label">去重分数:</span>
+            <input type="number" [(ngModel)]="dedupSimilarity" style="width: 55px; padding: 4px; border: 1px solid var(--border-color); border-radius: 4px;" />
+            <button class="btn" style="background-color: var(--secondary-color); color: white; padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer;" (click)="goToDedup()">去重</button>
+        </div>
+
+        <div class="sort-control" style="display: inline-flex; align-items: center;">
             <span class="sort-label">排序:</span>
             <select [value]="sortBy" (change)="onSortChange($any($event.target).value)" class="sort-select">
                 <option value="filename">文件名</option>

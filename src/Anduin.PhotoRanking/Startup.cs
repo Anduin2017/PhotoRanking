@@ -38,6 +38,7 @@ public class Startup : IWebStartup
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
         services.AddScoped<UserPreferenceService>();
+        services.AddScoped<DedupService>();
 
         services.AddHostedService<PredictorBackgroundService>();
 

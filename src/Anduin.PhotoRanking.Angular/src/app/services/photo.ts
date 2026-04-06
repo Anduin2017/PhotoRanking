@@ -121,4 +121,12 @@ export class PhotoService {
   guessScore(id: number): Observable<GuessScoreResult> {
     return this.http.get<GuessScoreResult>(`${this.apiBase}/photos/${id}/guess-score`);
   }
+
+  getDedupPreview(albumId: string, similarity: number = 93.0): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiBase}/albums/dedup-preview/${encodeURIComponent(albumId)}?similarity=${similarity}`);
+  }
+
+  bulkDelete(photoIds: number[]): Observable<any> {
+    return this.http.post<any>(`${this.apiBase}/photos/bulk-delete`, photoIds);
+  }
 }

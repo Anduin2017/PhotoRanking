@@ -19,6 +19,8 @@ export function browserMatcher(url: UrlSegment[]) {
     return null;
 }
 
+import { AlbumDedupPreviewComponent } from './components/album/album-dedup-preview/album-dedup-preview';
+
 export const routes: Routes = [
     { path: '', redirectTo: 'feed', pathMatch: 'full' },
     { path: 'feed', component: FeedComponent },
@@ -26,5 +28,6 @@ export const routes: Routes = [
     { matcher: browserMatcher, component: BrowserComponent },
     { path: 'advanced', component: AdvancedComponent },
     { path: 'album/:id', component: AlbumComponent },
+    { path: 'album/:id/dedup', component: AlbumDedupPreviewComponent },
     { path: 'similar/:id', component: SimilarComponent },
 ];

@@ -1,0 +1,52 @@
+<div class="main-content dedup-page" *ngIf="!isLoading">
+  <div class="dedup-header">
+    <h1>相册去重预览</h1>
+    <div class="dedup-meta">{{ albumId }} | 相似度阈值: {{ similarity }}%</div>
+    
+    <div class="actions">
+      <button class="btn btn-primary" [disabled]="selectedCount === 0 || isDeleting" (click)="deleteSelected()">
+        删除选中的 {{ selectedCount }} 张照片
+      </button>
+      <a class="btn btn-secondary" [routerLink]="['/album', albumId]">取消</a>
+    </div>
+  </div>
+
+  <div *ngIf="groups.length === 0" class="no-duplicates">
+    <p>在这个阈值下没有找到重复的照片。</p>
+  </div>
+
+  <div class="dedup-group" *ngFor="let group of groups; let i = index">
+    <div class="group-header">
+      <div class="group-title">组 {{ i + 1 }} (共 {{ group.duplicates.length + 1 }} 张)</div>
+    </div>
+    
+    <div class="group-photos">
+      <!-- Best Photo -->
+      <div class="photo-card best-photo">
+        <div class="badge">保留优先</div>
+        <img [src]="photoService.getImageUrl(group.bestPhoto.filePath)" loading="lazy" />
+        <div class="photo-info">
+          <div>综合分: {{ group.bestPhoto.overallScore | number:'1.2-2' }}</div>
+          <div class="file-path">{{ group.bestPhoto.filePath }}</div>
+        </div>
+      </div>
+      
+      <!-- Duplicates -->
+      <div class="photo-card duplicate-photo" *ngFor="let dup of group.duplicates">
+        <div class="checkbox-wrapper">
+          <input type="checkbox" [(ngModel)]="selectedDuplicates[dup.id]" />
+        </div>
+        <img [src]="photoService.getImageUrl(dup.filePath)" loading="lazy" />
+        <div class="photo-info">
+          <div>综合分: {{ dup.overallScore | number:'1.2-2' }}</div>
+          <div class="file-path">{{ dup.filePath }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="isLoading || isDeleting" class="loading-indicator">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" *ngIf="isDeleting">正在删除照片...</div>
+</div>

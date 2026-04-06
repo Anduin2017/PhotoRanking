@@ -15,16 +15,20 @@ public class PhotosController : ControllerBase
     private readonly ILogger<PhotosController> _logger;
     private readonly ImageAnalysisService _imageAnalysis;
 
+    private readonly IConfiguration _configuration;
+
     public PhotosController(
         AppDbContext context, 
         ScoringService scoringService, 
         ILogger<PhotosController> logger,
-        ImageAnalysisService imageAnalysis)
+        ImageAnalysisService imageAnalysis,
+        IConfiguration configuration)
     {
         _context = context;
         _scoringService = scoringService;
         _logger = logger;
         _imageAnalysis = imageAnalysis;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -532,6 +536,43 @@ public class PhotosController : ControllerBase
             .ToListAsync();
 
         return Ok(photos);
+    }
+
+    /// <summary>
+    /// 批量删除选定的照片
+    /// </summary>
+    [HttpPost("bulk-delete")]
+    public async Task<ActionResult> BulkDelete([FromBody] List<int> photoIds)
+    {
+        if (photoIds == null || photoIds.Count == 0)
+            return BadRequest("No photos selected for deletion.");
+
+        var photosToDelete = await _context.Photos.Where(p => photoIds.Contains(p.Id)).ToListAsync();
+        var photoRootPath = _configuration["PhotoRootPath"];
+
+        foreach (var photo in photosToDelete)
+        {
+            if (!string.IsNullOrEmpty(photoRootPath) && !photo.FilePath.Contains("..") && !Path.IsPathRooted(photo.FilePath))
+            {
+                var fullPath = Path.Combine(photoRootPath, photo.FilePath);
+                if (System.IO.File.Exists(fullPath))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(fullPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to delete file {FullPath}", fullPath);
+                    }
+                }
+            }
+
+            _context.Photos.Remove(photo);
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { deletedCount = photosToDelete.Count });
     }
 }
 

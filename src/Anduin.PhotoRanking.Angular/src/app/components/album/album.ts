@@ -1,13 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { Photo, PhotoService, Album } from '../../services/photo';
 import { PhotoViewerComponent } from '../photo-viewer/photo-viewer';
 
 @Component({
   selector: 'app-album',
   standalone: true,
-  imports: [CommonModule, PhotoViewerComponent],
+  imports: [CommonModule, FormsModule, PhotoViewerComponent],
   templateUrl: './album.html',
   styleUrl: './album.css',
 })
@@ -20,8 +21,9 @@ export class AlbumComponent implements OnInit {
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
+  dedupSimilarity: number = 93;
 
-  constructor(private route: ActivatedRoute, public photoService: PhotoService) { }
+  constructor(private route: ActivatedRoute, public photoService: PhotoService, private router: Router) { }
 
   ngOnInit() {
     this.route.params.subscribe(params => {
@@ -60,5 +62,11 @@ export class AlbumComponent implements OnInit {
   closeViewer() {
     this.viewerOpen = false;
     this.initialPhotoId = null;
+  }
+
+  goToDedup() {
+    this.router.navigate(['/album', this.albumId, 'dedup'], {
+      queryParams: { similarity: this.dedupSimilarity }
+    });
   }
 }

@@ -1,5 +1,6 @@
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
+using Anduin.PhotoRanking.Services;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -215,6 +216,33 @@ public class AlbumsController : ControllerBase
                 ThumbnailPath = topPhoto?.FilePath
             });
         }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// 获取相册的去重预览分组
+    /// </summary>
+    [HttpGet("dedup-preview/{*albumId}")]
+    public async Task<ActionResult<object>> DedupPreview(string albumId, [FromServices] DedupService dedupService, [FromQuery] double similarity = 93.0)
+    {
+        albumId = Uri.UnescapeDataString(albumId);
+        var album = await _context.Albums.FirstOrDefaultAsync(a => a.AlbumId == albumId);
+        if (album == null)
+            return NotFound();
+
+        var photos = await _context.Photos
+            .Where(p => p.AlbumId == albumId && p.FeatureVector != null)
+            .ToListAsync();
+
+        var groups = dedupService.GetDuplicateGroups(photos, similarity);
+
+        // Map groups to a flat or nested JSON structure
+        var result = groups.Select(g => new
+        {
+            BestPhoto = g.First(),
+            Duplicates = g.Skip(1).ToList()
+        }).ToList();
 
         return Ok(result);
     }
