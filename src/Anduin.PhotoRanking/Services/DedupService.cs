@@ -1,7 +1,4 @@
-using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Concurrent;
 
 namespace Anduin.PhotoRanking.Services;
 

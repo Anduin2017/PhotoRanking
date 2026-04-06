@@ -544,7 +544,7 @@ public class PhotosController : ControllerBase
     [HttpPost("bulk-delete")]
     public async Task<ActionResult> BulkDelete([FromBody] List<int> photoIds)
     {
-        if (photoIds == null || photoIds.Count == 0)
+        if (photoIds.Count == 0)
             return BadRequest("No photos selected for deletion.");
 
         var photosToDelete = await _context.Photos.Where(p => photoIds.Contains(p.Id)).ToListAsync();
