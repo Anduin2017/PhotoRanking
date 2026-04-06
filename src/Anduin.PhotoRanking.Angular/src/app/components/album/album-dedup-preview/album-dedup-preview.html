@@ -4,41 +4,51 @@
     <div class="dedup-meta">{{ albumId }} | 相似度阈值: {{ similarity }}%</div>
     
     <div class="actions">
-      <button class="btn btn-primary" [disabled]="selectedCount === 0 || isDeleting" (click)="deleteSelected()">
-        删除选中的 {{ selectedCount }} 张照片
+      <button class="btn btn-danger" [disabled]="selectedCount === 0 || isDeleting" (click)="deleteSelected()">
+        🗑 删除选中的 {{ selectedCount }} 张照片
       </button>
-      <a class="btn btn-secondary" [routerLink]="['/album', albumId]">取消</a>
+      <a class="btn btn-secondary" [routerLink]="['/album', albumId]">← 返回相册</a>
     </div>
   </div>
 
+  <div class="dedup-hint" *ngIf="groups.length > 0">
+    <span>💡 勾选 = 删除。系统已预选低分重复照片，最高分照片默认不勾选。你可以自由调整哪张留、哪张删。</span>
+  </div>
+
   <div *ngIf="groups.length === 0" class="no-duplicates">
-    <p>在这个阈值下没有找到重复的照片。</p>
+    <p>🎉 在这个阈值下没有找到重复的照片。</p>
   </div>
 
   <div class="dedup-group" *ngFor="let group of groups; let i = index">
     <div class="group-header">
-      <div class="group-title">组 {{ i + 1 }} (共 {{ group.duplicates.length + 1 }} 张)</div>
+      <div class="group-title">组 {{ i + 1 }} &nbsp;·&nbsp; 共 {{ group.duplicates.length + 1 }} 张相似照片</div>
     </div>
     
     <div class="group-photos">
-      <!-- Best Photo -->
-      <div class="photo-card best-photo">
-        <div class="badge">保留优先</div>
+      <!-- Best Photo – checkbox available but unchecked by default -->
+      <div class="photo-card" [class.marked-delete]="selectedPhotos[group.bestPhoto.id]">
+        <label class="checkbox-wrapper" [title]="selectedPhotos[group.bestPhoto.id] ? '取消删除' : '标记删除'">
+          <input type="checkbox" [(ngModel)]="selectedPhotos[group.bestPhoto.id]" />
+        </label>
+        <div class="badge badge-best" *ngIf="!selectedPhotos[group.bestPhoto.id]">★ 推荐保留</div>
+        <div class="badge badge-delete" *ngIf="selectedPhotos[group.bestPhoto.id]">🗑 待删除</div>
         <img [src]="photoService.getImageUrl(group.bestPhoto.filePath)" loading="lazy" />
         <div class="photo-info">
-          <div>综合分: {{ group.bestPhoto.overallScore | number:'1.2-2' }}</div>
+          <div class="score">综合分: <strong>{{ group.bestPhoto.overallScore | number:'1.2-2' }}</strong></div>
           <div class="file-path">{{ group.bestPhoto.filePath }}</div>
         </div>
       </div>
       
-      <!-- Duplicates -->
-      <div class="photo-card duplicate-photo" *ngFor="let dup of group.duplicates">
-        <div class="checkbox-wrapper">
-          <input type="checkbox" [(ngModel)]="selectedDuplicates[dup.id]" />
-        </div>
+      <!-- Duplicates – checked by default -->
+      <div class="photo-card" [class.marked-delete]="selectedPhotos[dup.id]" *ngFor="let dup of group.duplicates">
+        <label class="checkbox-wrapper" [title]="selectedPhotos[dup.id] ? '取消删除' : '标记删除'">
+          <input type="checkbox" [(ngModel)]="selectedPhotos[dup.id]" />
+        </label>
+        <div class="badge badge-best" *ngIf="!selectedPhotos[dup.id]">★ 已取消</div>
+        <div class="badge badge-delete" *ngIf="selectedPhotos[dup.id]">🗑 待删除</div>
         <img [src]="photoService.getImageUrl(dup.filePath)" loading="lazy" />
         <div class="photo-info">
-          <div>综合分: {{ dup.overallScore | number:'1.2-2' }}</div>
+          <div class="score">综合分: <strong>{{ dup.overallScore | number:'1.2-2' }}</strong></div>
           <div class="file-path">{{ dup.filePath }}</div>
         </div>
       </div>
@@ -48,5 +58,5 @@
 
 <div *ngIf="isLoading || isDeleting" class="loading-indicator">
   <div class="loading-spinner"></div>
-  <div class="loading-text" *ngIf="isDeleting">正在删除照片...</div>
+  <div class="loading-text" *ngIf="isDeleting">正在删除照片并更新统计...</div>
 </div>

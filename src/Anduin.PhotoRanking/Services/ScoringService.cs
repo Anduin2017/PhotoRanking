@@ -165,6 +165,15 @@ public class ScoringService
     }
 
     /// <summary>
+    /// 更新相册分数和统计（供外部调用）
+    /// </summary>
+    public async Task UpdateAlbumScoreAsync(string albumId)
+    {
+        await UpdateAlbumScoresAsync(albumId);
+        await UpdatePhotoScoresInAlbumAsync(albumId);
+    }
+
+    /// <summary>
     /// 更新相册分数和统计
     /// </summary>
     private async Task UpdateAlbumScoresAsync(string albumId)

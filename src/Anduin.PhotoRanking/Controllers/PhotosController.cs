@@ -571,7 +571,15 @@ public class PhotosController : ControllerBase
             _context.Photos.Remove(photo);
         }
 
+        // Group photos by album to re-calculate stats for affected albums
+        var affectedAlbumIds = photosToDelete.Select(p => p.AlbumId).Distinct().ToList();
         await _context.SaveChangesAsync();
+
+        foreach (var albumId in affectedAlbumIds)
+        {
+            await _scoringService.UpdateAlbumScoreAsync(albumId);
+        }
+
         return Ok(new { deletedCount = photosToDelete.Count });
     }
 }
