@@ -35,14 +35,28 @@
     </div>
 
     <div *ngIf="mode === 'featured'" class="discover-filter-container">
-        <label>选择独立分:</label>
-        <div class="score-selector">
-            <button *ngFor="let s of [0, 1, 2, 3, 4, 5, 6]" 
-                    class="score-btn" 
-                    [class.active]="minScore === s"
-                    (click)="setMinScore(s)">
-                {{ s }}
-            </button>
+        <div class="filter-row" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <div>
+                <label>选择独立分:</label>
+                <div class="score-selector" style="display: inline-flex; margin-left: 10px;">
+                    <button *ngFor="let s of [0, 1, 2, 3, 4, 5, 6]" 
+                            class="score-btn" 
+                            [class.active]="minScore === s"
+                            (click)="setMinScore(s)">
+                        {{ s }}
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label for="sortBySelect">排序条件:</label>
+                <select id="sortBySelect" [(ngModel)]="sortBy" (change)="setSortBy($event)" style="margin-left: 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                    <option value="random">随机</option>
+                    <option value="overalldesc">整体分降序</option>
+                    <option value="overallasc">整体分升序</option>
+                    <option value="estimateddesc">推测分降序</option>
+                    <option value="estimatedasc">推测分升序</option>
+                </select>
+            </div>
         </div>
     </div>
 

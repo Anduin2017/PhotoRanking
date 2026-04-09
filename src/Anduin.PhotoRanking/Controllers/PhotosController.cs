@@ -73,7 +73,8 @@ public class PhotosController : ControllerBase
         [FromQuery] string mode = "waiting",
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
-        [FromQuery] double? minScore = null)
+        [FromQuery] double? minScore = null,
+        [FromQuery] string sort = "random")
     {
         List<Photo> candidates;
 
@@ -137,6 +138,25 @@ public class PhotosController : ControllerBase
         if (candidates.Count == 0)
         {
             return Ok(new List<Photo>());
+        }
+
+        if (mode.ToLower() == "featured" && sort.ToLower() != "random")
+        {
+            candidates = sort.ToLower() switch
+            {
+                "overalldesc" => candidates.OrderByDescending(p => p.OverallScore).ToList(),
+                "overallasc" => candidates.OrderBy(p => p.OverallScore).ToList(),
+                "estimateddesc" => candidates.OrderByDescending(p => p.EstimatedScore ?? -1).ToList(),
+                "estimatedasc" => candidates.OrderBy(p => p.EstimatedScore ?? -1).ToList(),
+                _ => candidates
+            };
+
+            var sortedPagePhotos = candidates
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(sortedPagePhotos);
         }
 
         // 定义权重选择器

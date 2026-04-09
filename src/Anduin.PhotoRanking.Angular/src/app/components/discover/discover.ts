@@ -1,5 +1,6 @@
 import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Photo, PhotoService } from '../../services/photo';
 import { PhotoViewerComponent } from '../photo-viewer/photo-viewer';
@@ -7,7 +8,7 @@ import { PhotoViewerComponent } from '../photo-viewer/photo-viewer';
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [CommonModule, PhotoViewerComponent, RouterModule],
+  imports: [CommonModule, FormsModule, PhotoViewerComponent, RouterModule],
   templateUrl: './discover.html',
   styleUrl: './discover.css',
 })
@@ -19,8 +20,10 @@ export class DiscoverComponent implements OnInit {
   pageSize = 30;
   mode = 'waiting';
   minScore = 3.0;
+  sortBy = 'random'; // New property for sorting in featured mode
   loadingMode: string | null = null; // Track which mode is currently being loaded
   loadingMinScore: number | null = null; // Track which minScore is currently being loaded
+  loadingSortBy: string | null = null; // Track which sortBy is currently being loaded
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -47,6 +50,12 @@ export class DiscoverComponent implements OnInit {
     this.resetAndLoad();
   }
 
+  setSortBy(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    this.sortBy = target.value;
+    this.resetAndLoad();
+  }
+
   private resetAndLoad() {
     this.photos = [];
     this.page = 1;
@@ -61,14 +70,17 @@ export class DiscoverComponent implements OnInit {
     this.isLoading = true;
     const requestMode = this.mode; // Capture the current mode for this request
     const requestMinScore = this.minScore; // Capture the current minScore for this request
+    const requestSortBy = this.sortBy; // Capture the current sortBy
     this.loadingMode = requestMode;
     this.loadingMinScore = requestMinScore;
+    this.loadingSortBy = requestSortBy;
 
     const minScoreToSend = (requestMode === 'enjoy' || requestMode === 'featured') ? requestMinScore : undefined;
-    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize, minScoreToSend).subscribe({
+    const sortToSend = (requestMode === 'featured') ? requestSortBy : undefined;
+    this.photoService.getDiscoverPhotos(requestMode, this.page, this.pageSize, minScoreToSend, sortToSend).subscribe({
       next: (newPhotos) => {
-        // Ignore this response if the mode or minScore has changed since the request was made
-        if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore) {
+        // Ignore this response if the mode, minScore or sortBy has changed since the request was made
+        if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore || this.loadingSortBy !== requestSortBy) {
           return;
         }
 
@@ -88,7 +100,7 @@ export class DiscoverComponent implements OnInit {
       },
       error: (err) => {
         // Ignore errors from outdated requests
-        if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore) {
+        if (this.loadingMode !== requestMode || this.loadingMinScore !== requestMinScore || this.loadingSortBy !== requestSortBy) {
           return;
         }
 
