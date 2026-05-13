@@ -33,6 +33,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   slideInterval = 15; // seconds
   showSettings = false;
   private timer: any = null;
+  private wakeLock: any = null;
 
   constructor(
     public photoService: PhotoService, 
@@ -167,6 +168,34 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     }
   }
 
+  @HostListener('document:visibilitychange')
+  async onVisibilityChange() {
+    if (document.visibilityState === 'visible' && this.isPlaying) {
+      await this.requestWakeLock();
+    }
+  }
+
+  async requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        this.wakeLock = await (navigator as any).wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => {
+          console.log('Screen Wake Lock released');
+        });
+        console.log('Screen Wake Lock active');
+      } catch (err: any) {
+        console.error(`${err.name}, ${err.message}`);
+      }
+    }
+  }
+
+  releaseWakeLock() {
+    if (this.wakeLock !== null) {
+      this.wakeLock.release().catch(console.error);
+      this.wakeLock = null;
+    }
+  }
+
   // Slideshow methods
   togglePlay(event?: Event) {
     if (event) event.stopPropagation();
@@ -180,6 +209,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   startSlideshow() {
     this.isPlaying = true;
+    this.requestWakeLock();
     if (document.fullscreenEnabled && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(err => {
         console.error(`Error attempting to enable full-screen mode: ${err.message}`);
@@ -202,6 +232,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   stopSlideshow() {
     this.isPlaying = false;
+    this.releaseWakeLock();
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
