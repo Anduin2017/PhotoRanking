@@ -1,0 +1,71 @@
+<div class="album-page-container main-content">
+    <!-- Header -->
+    <div class="album-header">
+        <div class="album-title-section">
+            <h1 class="album-title">Image Search</h1>
+            <div class="album-meta">Upload an image to find visually similar photos</div>
+        </div>
+    </div>
+
+    <!-- Upload Zone -->
+    <div
+        class="upload-zone"
+        [class.drag-over]="dragOver"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        (click)="fileInput.click()"
+    >
+        <input
+            #fileInput
+            type="file"
+            accept="image/*"
+            hidden
+            (change)="onFileInputChange($event)"
+        />
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <div class="upload-text">Drop an image here or click to browse</div>
+        <div class="upload-hint">Supports JPG, PNG, GIF, WebP</div>
+    </div>
+
+    <!-- Query Image Preview -->
+    <div class="target-photo-container" *ngIf="queryImageUrl">
+        <div class="target-photo-card">
+            <div class="target-photo-badge">Query</div>
+            <img [src]="queryImageUrl" class="target-photo-img" />
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="isLoading" class="loading-indicator">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Results Grid -->
+    <div class="discover-photos-grid" *ngIf="!isLoading && photos.length > 0">
+        <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
+            <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy" />
+            <div class="discover-item-overlay">
+                <div class="discover-item-score" *ngIf="photo.similarity !== undefined">
+                    Similarity: {{ photo.similarity * 100 | number:'1.1-1' }}%
+                </div>
+                <div class="discover-item-score">Overall Score: {{ photo.overallScore | number:'1.2-2' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!isLoading && hasSearched && photos.length === 0" style="text-align: center; color: var(--text-secondary); padding: 50px;">
+        No similar photos found.
+    </div>
+</div>
+
+<app-photo-viewer *ngIf="viewerOpen"
+    [startPhotoId]="initialPhotoId"
+    [photos]="photos"
+    (close)="closeViewer()">
+</app-photo-viewer>

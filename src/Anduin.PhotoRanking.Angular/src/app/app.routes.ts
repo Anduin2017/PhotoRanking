@@ -6,6 +6,7 @@ import { BrowserComponent } from './components/browser/browser';
 import { AlbumComponent } from './components/album/album';
 import { AdvancedComponent } from './components/advanced/advanced';
 import { SimilarComponent } from './components/similar/similar';
+import { SearchComponent } from './components/search/search';
 
 export function browserMatcher(url: UrlSegment[]) {
     if (url.length > 0 && url[0].path === 'browser') {
@@ -30,4 +31,5 @@ export const routes: Routes = [
     { path: 'album/:id', component: AlbumComponent },
     { path: 'album/:id/dedup', component: AlbumDedupPreviewComponent },
     { path: 'similar/:id', component: SimilarComponent },
+    { path: 'search', component: SearchComponent },
 ];

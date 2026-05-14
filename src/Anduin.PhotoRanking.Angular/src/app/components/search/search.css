@@ -1,0 +1,178 @@
+.album-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.album-title-section {
+    margin-bottom: 1rem;
+}
+
+.album-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.album-meta {
+    font-family: monospace;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Upload Zone */
+.upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 3rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--bg-card);
+    margin-bottom: 2rem;
+}
+
+.upload-zone:hover,
+.upload-zone.drag-over {
+    border-color: var(--primary);
+    background: rgba(138, 43, 226, 0.05);
+}
+
+.upload-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+    stroke-width: 1.5;
+}
+
+.upload-zone:hover .upload-icon,
+.upload-zone.drag-over .upload-icon {
+    color: var(--primary);
+}
+
+.upload-text {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.upload-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Query Image */
+.target-photo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.target-photo-card {
+    position: relative;
+    max-width: 400px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--primary);
+}
+
+.target-photo-img {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    display: block;
+    background: #000;
+}
+
+.target-photo-badge {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: var(--primary);
+    color: white;
+    padding: 0.2rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    z-index: 1;
+}
+
+/* Results Grid — matches discover/photos grid */
+.discover-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.discover-item {
+    aspect-ratio: 1;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.discover-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+}
+
+.discover-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.discover-item-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    padding: 1rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.discover-item:hover .discover-item-overlay {
+    opacity: 1;
+}
+
+.discover-item-score {
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+/* Loading Spinner */
+.loading-indicator {
+    display: flex;
+    justify-content: center;
+    padding: 50px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

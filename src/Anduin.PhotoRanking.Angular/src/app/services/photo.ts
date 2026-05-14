@@ -132,4 +132,10 @@ export class PhotoService {
   bulkDelete(photoIds: number[]): Observable<any> {
     return this.http.post<any>(`${this.apiBase}/photos/bulk-delete`, photoIds);
   }
+
+  searchByImage(file: File, take: number = 20): Observable<Photo[]> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<Photo[]>(`${this.apiBase}/photos/search-by-image?take=${take}`, formData);
+  }
 }
