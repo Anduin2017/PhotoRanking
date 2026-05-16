@@ -3,8 +3,7 @@ using Anduin.PhotoRanking.Services;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Aiursoft.Canon;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 
 namespace Anduin.PhotoRanking.Tests;
 
@@ -17,16 +16,18 @@ public class SeederServiceTests
     private static void CreateTestImage(string path)
     {
         // Create a simple valid 32x32 image that can be processed by ImageAnalysisService
-        using var image = new Image<Rgba32>(32, 32);
-        // Fill with some pixel data
+        using var image = new SKBitmap(32, 32, SKColorType.Rgba8888, SKAlphaType.Opaque);
         for (int y = 0; y < 32; y++)
         {
             for (int x = 0; x < 32; x++)
             {
-                image[x, y] = new Rgba32((byte)(x * 8), (byte)(y * 8), 128);
+                image.SetPixel(x, y, new SKColor((byte)(x * 8), (byte)(y * 8), 128));
             }
         }
-        image.SaveAsPng(path);
+
+        using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+        using var stream = File.OpenWrite(path);
+        encoded.SaveTo(stream);
     }
 
     [TestInitialize]

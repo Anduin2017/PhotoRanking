@@ -1,8 +1,6 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using SkiaSharp;
 
 namespace Anduin.PhotoRanking.Services;
 
@@ -10,13 +8,11 @@ public class ImageAnalysisService
 {
     // CLIP output dimension is 512
 
-
     private static Lazy<InferenceSession> _session = new(() => {
-        try 
+        try
         {
             var modelPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models", "clip-visual.onnx");
-            var options = new Microsoft.ML.OnnxRuntime.SessionOptions(); 
-            // Optional: Explicitly set execution provider if needed, but CPU is default.
+            var options = new Microsoft.ML.OnnxRuntime.SessionOptions();
             return new InferenceSession(modelPath, options);
         }
         catch (Exception e)
@@ -31,47 +27,52 @@ public class ImageAnalysisService
     {
         try
         {
-            using var image = Image.Load<Rgba32>(filePath);
-            
-            // Resize to 224x224 (CLIP standard)
-            image.Mutate(x => x
-                .Resize(new ResizeOptions 
-                {
-                    Size = new Size(224, 224),
-                    Mode = ResizeMode.Crop
-                }));
+            using var original = SKBitmap.Decode(filePath);
+            if (original == null) return null;
+
+            // Resize to 224x224 (CLIP standard) with center crop
+            float scale = Math.Max(224f / original.Width, 224f / original.Height);
+            int resizedW = (int)(original.Width * scale);
+            int resizedH = (int)(original.Height * scale);
+            using var resized = original.Resize(new SKSizeI(resizedW, resizedH), new SKSamplingOptions(SKFilterMode.Linear));
+            if (resized == null) return null;
+
+            using var image = new SKBitmap(224, 224);
+            int cropX = (resizedW - 224) / 2;
+            int cropY = (resizedH - 224) / 2;
+            using (var canvas = new SKCanvas(image))
+            {
+                canvas.DrawBitmap(resized,
+                    new SKRect(cropX, cropY, cropX + 224, cropY + 224),
+                    new SKRect(0, 0, 224, 224));
+            }
 
             var input = new DenseTensor<float>(new[] { 1, 3, 224, 224 });
-            
+
             // CLIP Mean and Std
             var mean = new[] { 0.48145466f, 0.4578275f, 0.40821073f };
             var std = new[] { 0.26862954f, 0.26130258f, 0.27577711f };
 
-            image.ProcessPixelRows(accessor =>
+            for (int y = 0; y < 224; y++)
             {
-                for (int y = 0; y < accessor.Height; y++)
+                for (int x = 0; x < 224; x++)
                 {
-                    var pixelRow = accessor.GetRowSpan(y);
-                    for (int x = 0; x < pixelRow.Length; x++)
-                    {
-                        var pixel = pixelRow[x];
-                        
-                        // Normalize: (Pixel - Mean) / Std
-                        input[0, 0, y, x] = ((pixel.R / 255f) - mean[0]) / std[0];
-                        input[0, 1, y, x] = ((pixel.G / 255f) - mean[1]) / std[1];
-                        input[0, 2, y, x] = ((pixel.B / 255f) - mean[2]) / std[2];
-                    }
+                    var pixel = image.GetPixel(x, y);
+                    // Normalize: (Pixel - Mean) / Std
+                    input[0, 0, y, x] = ((pixel.Red / 255f) - mean[0]) / std[0];
+                    input[0, 1, y, x] = ((pixel.Green / 255f) - mean[1]) / std[1];
+                    input[0, 2, y, x] = ((pixel.Blue / 255f) - mean[2]) / std[2];
                 }
-            });
+            }
 
-            var inputs = new List<NamedOnnxValue> 
-            { 
-                NamedOnnxValue.CreateFromTensor("pixel_values", input) 
+            var inputs = new List<NamedOnnxValue>
+            {
+                NamedOnnxValue.CreateFromTensor("pixel_values", input)
             };
-            
+
             using var results = _session.Value.Run(inputs);
             var output = results.First().AsTensor<float>();
-            
+
             return FloatArrayToByteArray(output.ToArray());
         }
         catch (Exception e)
