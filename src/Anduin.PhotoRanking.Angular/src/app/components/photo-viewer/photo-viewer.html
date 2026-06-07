@@ -71,7 +71,13 @@
 
             <div style="width: 1px; height: 40px; background: var(--border); margin: 0 0.5rem;"></div>
 
-            <button class="rating-btn" (click)="viewSimilar($event)" title="View Similar Images">
+            <button class="rating-btn" (click)="toggleFlip($event)" [class.active]="flipped" title="镜像翻转">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
+                        <path d="M12 3v18M22 9l-5 5 5 5M2 9l5 5-5 5"/>
+                    </svg>
+                </button>
+
+                <button class="rating-btn" (click)="viewSimilar($event)" title="View Similar Images">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>

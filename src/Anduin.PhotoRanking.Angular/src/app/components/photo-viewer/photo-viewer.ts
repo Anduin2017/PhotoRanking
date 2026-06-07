@@ -27,6 +27,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   showInfo = true;
   guessedScore: number | null = null;
   isGuessing = false;
+  flipped = false;
 
   // Slideshow
   isPlaying = false;
@@ -82,9 +83,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         renderSlide: (slide: any) => {
           const photo = slide as Photo;
           const imgUrl = this.photoService.getImageUrl(photo.filePath);
+          const flipStyle = this.flipped ? 'transform: scaleX(-1);' : '';
           return `<div class="swiper-slide" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
                         <div class="swiper-zoom-container">
-                            <img src="${imgUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+                            <img src="${imgUrl}" style="max-width:100%; max-height:100%; object-fit:contain;${flipStyle}" />
                         </div>
                     </div>`;
         }
@@ -304,6 +306,14 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     if (this.showInfo && this.currentPhoto) {
       this.onClose();
       this.router.navigate(['/album', this.currentPhoto.albumId]);
+    }
+  }
+
+  toggleFlip(event?: Event) {
+    if (event) event.stopPropagation();
+    this.flipped = !this.flipped;
+    if (this.swiper) {
+      this.swiper.virtual.update(true);
     }
   }
 
