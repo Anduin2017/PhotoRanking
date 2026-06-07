@@ -559,6 +559,45 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
+    /// 删除单张照片（从文件系统和数据库中删除）
+    /// </summary>
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeletePhoto(int id)
+    {
+        var photo = await _context.Photos.FindAsync(id);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        var photoRootPath = _configuration["PhotoRootPath"];
+
+        if (!string.IsNullOrEmpty(photoRootPath) && !photo.FilePath.Contains("..") && !Path.IsPathRooted(photo.FilePath))
+        {
+            var fullPath = Path.Combine(photoRootPath, photo.FilePath);
+            if (System.IO.File.Exists(fullPath))
+            {
+                try
+                {
+                    System.IO.File.Delete(fullPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to delete file {FullPath}", fullPath);
+                }
+            }
+        }
+
+        var albumId = photo.AlbumId;
+        _context.Photos.Remove(photo);
+        await _context.SaveChangesAsync();
+
+        await _scoringService.UpdateAlbumScoreAsync(albumId);
+
+        return Ok(new { deleted = true, id });
+    }
+
+    /// <summary>
     /// 批量删除选定的照片
     /// </summary>
     [HttpPost("bulk-delete")]

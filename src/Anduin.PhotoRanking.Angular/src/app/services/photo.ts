@@ -129,6 +129,12 @@ export class PhotoService {
     return this.http.get<any[]>(`${this.apiBase}/albums/dedup-preview/${encodeURIComponent(albumId)}?similarity=${similarity}`);
   }
 
+  deletePhoto(id: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiBase}/photos/${id}`).pipe(
+      tap(() => this.ratingChanged$.next())
+    );
+  }
+
   bulkDelete(photoIds: number[]): Observable<any> {
     return this.http.post<any>(`${this.apiBase}/photos/bulk-delete`, photoIds);
   }

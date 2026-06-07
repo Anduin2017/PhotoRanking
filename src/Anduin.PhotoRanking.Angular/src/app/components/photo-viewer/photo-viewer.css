@@ -250,3 +250,14 @@
     border-color: var(--primary);
     color: var(--primary);
 }
+
+.rating-btn.delete-btn {
+    border-color: rgba(220, 38, 38, 0.5);
+    color: #ef4444;
+}
+
+.rating-btn.delete-btn:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: #fff;
+}
