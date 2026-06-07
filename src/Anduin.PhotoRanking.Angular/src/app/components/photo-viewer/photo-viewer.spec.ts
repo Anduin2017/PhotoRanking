@@ -12,7 +12,9 @@ describe('PhotoViewerComponent', () => {
     getImageUrl: (path: string) => path,
     getPhoto: (id: number) => of({}),
     viewPhoto: (id: number) => of({}),
-    ratePhoto: (id: number, score: number) => of({})
+    ratePhoto: (id: number, score: number) => of({}),
+    deletePhoto: (id: number) => of({}),
+    guessScore: (id: number) => of({ predictedScore: 0, votes: {} })
   };
 
   const routerMock = {

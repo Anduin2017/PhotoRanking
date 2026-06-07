@@ -325,6 +325,47 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     }
   }
 
+  deletePhoto(event?: Event) {
+    if (event) event.stopPropagation();
+    if (!this.currentPhoto) return;
+
+    const confirmed = confirm('确定要删除这张照片吗？此操作不可撤销。');
+    if (!confirmed) return;
+
+    const photoId = this.currentPhoto.id;
+    const currentIndex = this.swiper?.activeIndex || 0;
+
+    this.photoService.deletePhoto(photoId).subscribe({
+      next: () => {
+        // Remove from local photos array
+        this.photos = this.photos.filter(p => p.id !== photoId);
+
+        if (this.photos.length === 0) {
+          // No photos left, close the viewer
+          this.onClose();
+          return;
+        }
+
+        // Update swiper virtual slides
+        if (this.swiper && this.swiper.virtual) {
+          this.swiper.virtual.slides = this.photos;
+          this.swiper.virtual.update(true);
+
+          // Navigate to the next photo or stay at the same position
+          const newIndex = Math.min(currentIndex, this.photos.length - 1);
+          this.swiper.slideTo(newIndex, 0);
+          if (this.photos[newIndex]) {
+            this.updateOverlay(this.photos[newIndex].id);
+          }
+        }
+      },
+      error: (err) => {
+        console.error('删除照片失败:', err);
+        alert('删除照片失败，请稍后重试。');
+      }
+    });
+  }
+
   @HostListener('window:wheel', ['$event'])
   onWheel(event: WheelEvent) {
     if (this.swiper && this.swiper.zoom) {
