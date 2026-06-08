@@ -162,6 +162,11 @@
     /* Styles are inline in render function but could be here */
 }
 
+/* Flip/mirror all images */
+.swiper.flipped .swiper-zoom-container img {
+    transform: scaleX(-1);
+}
+
 .swiper-zoom-target {
     /* Styles inline */
 }

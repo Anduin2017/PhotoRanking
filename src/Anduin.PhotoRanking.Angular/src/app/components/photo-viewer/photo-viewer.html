@@ -2,7 +2,7 @@
     <div class="viewer-overlay" (click)="onClose()"></div>
 
     <!-- Swiper Container -->
-    <div class="swiper" #swiperContainer style="width: 100%; height: 100%;">
+    <div class="swiper" #swiperContainer style="width: 100%; height: 100%;" [class.flipped]="flipped">
         <div class="swiper-wrapper">
              <!-- Slides injected by Swiper Virtual -->
         </div>
