@@ -83,9 +83,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         renderSlide: (slide: any) => {
           const photo = slide as Photo;
           const imgUrl = this.photoService.getImageUrl(photo.filePath);
+          const flipTransform = this.flipped ? 'transform: scaleX(-1);' : '';
           return `<div class="swiper-slide" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
                         <div class="swiper-zoom-container">
-                            <img src="${imgUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" />
+                            <img src="${imgUrl}" style="max-width:100%; max-height:100%; object-fit:contain; ${flipTransform}" />
                         </div>
                     </div>`;
         }
@@ -311,6 +312,12 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   toggleFlip(event?: Event) {
     if (event) event.stopPropagation();
     this.flipped = !this.flipped;
+
+    // Force re-render of Swiper virtual slides so the inline flip
+    // transform is picked up in renderSlide immediately.
+    if (this.swiper?.virtual) {
+      this.swiper.virtual.update(true);
+    }
   }
 
   viewSimilar(event?: Event) {
