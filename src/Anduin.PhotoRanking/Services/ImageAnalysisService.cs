@@ -42,9 +42,10 @@ public class ImageAnalysisService
             int cropY = (resizedH - 224) / 2;
             using (var canvas = new SKCanvas(image))
             {
-                canvas.DrawBitmap(resized,
+                canvas.DrawImage(SKImage.FromBitmap(resized),
                     new SKRect(cropX, cropY, cropX + 224, cropY + 224),
-                    new SKRect(0, 0, 224, 224));
+                    new SKRect(0, 0, 224, 224),
+                    SKSamplingOptions.Default);
             }
 
             var input = new DenseTensor<float>(new[] { 1, 3, 224, 224 });
