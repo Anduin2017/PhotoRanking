@@ -105,7 +105,8 @@ validate_docker:
         - build
     script:
         - docker buildx use aiur-global-builder
-        - docker buildx build . --platform linux/amd64,linux/arm64
+        # ML.NET 5 supports x64/x86 only; production runs on x86_64.
+        - docker buildx build . --platform linux/amd64
     rules:
         - exists:
               - Dockerfile
@@ -194,7 +195,8 @@ deploy_docker_all:
         - docker buildx use aiur-global-builder
         # Both required destinations must succeed. China replication is handled
         # asynchronously by puller_cn after the home-registry push completes.
-        - docker buildx build . --platform linux/amd64,linux/arm64 --tag "$LOCAL_TARGET_COM" --tag "$PUBLIC_TARGET" --push
+        # ML.NET 5 supports x64/x86 only; production runs on x86_64.
+        - docker buildx build . --platform linux/amd64 --tag "$LOCAL_TARGET_COM" --tag "$PUBLIC_TARGET" --push
 
     rules:
         - if: '$CI_COMMIT_BRANCH == "master"'
