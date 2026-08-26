@@ -17,8 +17,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   @Input() startPhotoId: number | null = null;
   @Input() photos: Photo[] = [];
   @Input() hasMore = false;
+  @Input() autoPlay = false;
   @Output() close = new EventEmitter<void>();
   @Output() requestMore = new EventEmitter<void>();
+  @Output() rated = new EventEmitter<number>();
 
   @ViewChild('swiperContainer') swiperContainer!: ElementRef;
 
@@ -26,7 +28,6 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   currentPhoto: Photo | null = null;
   showInfo = true;
   guessedScore: number | null = null;
-  isGuessing = false;
   flipped = false;
 
   // Slideshow
@@ -56,6 +57,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   ngAfterViewInit() {
     this.initSwiper();
+    if (this.autoPlay) {
+      this.startSlideshow();
+    }
   }
 
   ngOnDestroy() {
@@ -126,33 +130,12 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.guessedScore = null;
     this.photoService.getPhoto(photoId).subscribe(photo => {
       this.currentPhoto = photo;
-      const localPhoto = this.photos.find(p => p.id === photoId);
-      if (localPhoto && localPhoto.estimatedScore) {
-        this.guessedScore = localPhoto.estimatedScore;
+      if (photo.manualScore != null && photo.predictedScore != null) {
+        this.guessedScore = photo.predictedScore;
       }
     });
 
     this.photoService.viewPhoto(photoId).subscribe();
-  }
-
-  guessScore(event?: Event) {
-    if (event) event.stopPropagation();
-    if (!this.currentPhoto || this.isGuessing) return;
-
-    this.isGuessing = true;
-    this.photoService.guessScore(this.currentPhoto.id).subscribe({
-      next: (result) => {
-        this.guessedScore = result.predictedScore;
-        console.log('🎯 猜测独立分投票结果:', result);
-        console.log('预测分数:', result.predictedScore);
-        console.log('投票详情:', result.votes);
-        this.isGuessing = false;
-      },
-      error: (err) => {
-        console.error(err);
-        this.isGuessing = false;
-      }
-    });
   }
 
   onClose() {
@@ -161,13 +144,6 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
       document.exitFullscreen().catch(err => console.error(err));
     }
     this.close.emit();
-  }
-
-  onMiniBoxClick(event: Event) {
-    event.stopPropagation();
-    if (this.currentPhoto && this.currentPhoto.independentScore == null && this.guessedScore === null && !this.isGuessing) {
-      this.guessScore();
-    }
   }
 
   @HostListener('document:visibilitychange')
@@ -272,11 +248,18 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         }
 
         this.currentPhoto = updatedPhoto;
+        this.guessedScore = updatedPhoto.predictedScore ?? null;
         // Optionally update the photo in the list if reference is shared or find it by ID
         const index = this.photos.findIndex(p => p.id === updatedPhoto.id);
         if (index !== -1) {
           this.photos[index] = { ...this.photos[index], ...updatedPhoto };
         }
+        if (this.swiper && !this.swiper.isEnd) {
+          this.swiper.slideNext();
+        } else if (this.hasMore) {
+          this.requestMore.emit();
+        }
+        this.rated.emit(updatedPhoto.id);
       },
       error: (err) => {
         console.error(err);
@@ -290,10 +273,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   }
 
   isRated(score: number): boolean {
-    if (!this.currentPhoto || this.currentPhoto.independentScore == null) {
+    if (!this.currentPhoto || this.currentPhoto.manualScore == null) {
       return false;
     }
-    return Math.round(this.currentPhoto.independentScore) === score;
+    return Math.round(this.currentPhoto.manualScore) === score;
   }
 
   truncateAlbumName(name: string): string {
@@ -389,12 +372,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
       this.swiper?.slidePrev();
     } else if (event.key === 'Escape') {
       this.onClose();
-    } else if (event.key >= '0' && event.key <= '5') {
+    } else if (event.key >= '2' && event.key <= '5') {
       this.ratePhoto(parseInt(event.key));
     } else if (event.key === '6') {
       this.ratePhoto(6);
-    } else if (event.key === '/') {
-      this.guessScore();
     }
   }
 }

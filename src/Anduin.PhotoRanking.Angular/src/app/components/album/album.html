@@ -8,7 +8,7 @@
 
         <div class="album-stats-row">
             <div class="stat-badge-large">
-                <span class="label">相册评分</span>
+                <span class="label">相册排名分</span>
                 <span class="value">{{ album.albumScore | number:'1.2-2' }}</span>
             </div>
             <div class="stat-badge-large">
@@ -17,7 +17,7 @@
             </div>
              <div class="stat-badge-large">
                 <span class="label">已评分</span>
-                <span class="value">{{ album.knownRate * 100 | number:'1.0-1' }}%</span>
+                <span class="value">{{ album.ratedRate * 100 | number:'1.0-1' }}%</span>
             </div>
              <div class="stat-badge-large">
                 <span class="label">照片数</span>
@@ -38,9 +38,9 @@
             <span class="sort-label">排序:</span>
             <select [value]="sortBy" (change)="onSortChange($any($event.target).value)" class="sort-select">
                 <option value="filename">文件名</option>
-                <option value="overallscore">整体分排序</option>
-                <option value="independentscore">独立分排序</option>
-                <option value="estimatedscore">按推测分排序</option>
+                <option value="score">有效分排序</option>
+                <option value="manualscore">最终人工分排序</option>
+                <option value="estimatedscore">AI 预测排序</option>
                 <option value="rated">已打分优先</option>
                 <option value="unrated">未打分优先</option>
             </select>
@@ -53,11 +53,11 @@
             <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
             <div class="discover-item-overlay">
                 <div class="discover-item-score">
-                    <ng-container *ngIf="sortBy === 'estimatedscore' && photo.estimatedScore">
-                        推测: {{ photo.estimatedScore | number:'1.2-2' }}
+                    <ng-container *ngIf="sortBy === 'estimatedscore' && photo.predictedScore != null">
+                        AI 预测: {{ photo.predictedScore | number:'1.2-2' }}
                     </ng-container>
-                    <ng-container *ngIf="sortBy !== 'estimatedscore' || !photo.estimatedScore">
-                        分数: {{ photo.overallScore | number:'1.2-2' }}
+                    <ng-container *ngIf="sortBy !== 'estimatedscore' || photo.predictedScore == null">
+                        分数: {{ photo.displayScore | number:'1.2-2' }}
                     </ng-container>
                 </div>
             </div>

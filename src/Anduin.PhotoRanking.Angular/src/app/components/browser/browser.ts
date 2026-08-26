@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { PhotoService, Album } from '../../services/photo';
 import { Router, ActivatedRoute } from '@angular/router';
 
-export type SortOption = 'name' | 'knownRate' | 'albumScore' | 'photoCount';
+export type SortOption = 'name' | 'ratedRate' | 'albumScore' | 'photoCount';
 
 interface FolderItem {
   name: string;
@@ -11,7 +11,7 @@ interface FolderItem {
   isParent?: boolean;
   photoCount: number;
   albumScore: number;
-  knownRate: number;
+  ratedRate: number;
 }
 
 @Component({
@@ -129,8 +129,8 @@ export class BrowserComponent implements OnInit {
       const avgScore = totalPhotos > 0 
           ? descendantAlbums.reduce((sum, a) => sum + a.albumScore * a.photoCount, 0) / totalPhotos
           : 0;
-      const avgKnown = totalPhotos > 0
-          ? descendantAlbums.reduce((sum, a) => sum + a.knownRate * a.photoCount, 0) / totalPhotos
+      const avgRatedRate = totalPhotos > 0
+          ? descendantAlbums.reduce((sum, a) => sum + a.ratedRate * a.photoCount, 0) / totalPhotos
           : 0;
 
       folders.push({
@@ -138,14 +138,14 @@ export class BrowserComponent implements OnInit {
         fullPath,
         photoCount: totalPhotos,
         albumScore: avgScore,
-        knownRate: avgKnown
+        ratedRate: avgRatedRate
       });
     });
 
     // 4. Sort
     const sortFn = (a: any, b: any) => {
       if (this.sortBy === 'name') return a.name.localeCompare(b.name);
-      if (this.sortBy === 'knownRate') return b.knownRate - a.knownRate;
+      if (this.sortBy === 'ratedRate') return b.ratedRate - a.ratedRate;
       if (this.sortBy === 'albumScore') return b.albumScore - a.albumScore;
       if (this.sortBy === 'photoCount') return b.photoCount - a.photoCount;
       return 0;
@@ -163,7 +163,7 @@ export class BrowserComponent implements OnInit {
         isParent: true,
         photoCount: 0,
         albumScore: 0,
-        knownRate: 0
+        ratedRate: 0
       });
     }
 

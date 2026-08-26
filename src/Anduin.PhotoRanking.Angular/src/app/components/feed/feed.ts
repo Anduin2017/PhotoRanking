@@ -16,7 +16,8 @@ export class FeedComponent implements OnInit {
   isLoading = false;
   hasMore = true;
   pageSize = 20;
-  pool = 200;
+  private cursorScore: number | undefined;
+  private cursorId: number | undefined;
 
   viewerOpen = false;
   initialPhotoId: number | null = null;
@@ -42,12 +43,21 @@ export class FeedComponent implements OnInit {
     if (this.isLoading || !this.hasMore) return;
 
     this.isLoading = true;
-    this.photoService.getFeed(this.pageSize, this.pool).subscribe({
+    this.photoService.getFeed(this.pageSize, this.cursorScore, this.cursorId).subscribe({
       next: (newPhotos) => {
         if (newPhotos.length === 0) {
           this.hasMore = false;
         } else {
-          this.photos = [...this.photos, ...newPhotos];
+          const existingIds = new Set(this.photos.map(p => p.id));
+          const uniquePhotos = newPhotos.filter(p => !existingIds.has(p.id));
+          this.photos = [...this.photos, ...uniquePhotos];
+
+          const last = newPhotos[newPhotos.length - 1];
+          this.cursorScore = last.predictedScore ?? last.estimatedScore ?? undefined;
+          this.cursorId = last.id;
+          if (uniquePhotos.length === 0) {
+            this.hasMore = false;
+          }
         }
         this.isLoading = false;
       },
@@ -68,26 +78,19 @@ export class FeedComponent implements OnInit {
     this.initialPhotoId = null;
   }
 
-  isSixUnlocked(photo: Photo): boolean {
-    if (!photo.album) return false;
-    return photo.ratingCount > 8 &&
-      Math.round(photo.independentScore ?? 0) >= 5 &&
-      photo.album.albumScore > 3.1;
-  }
-
   onRate(photo: Photo, score: number, event: Event) {
     event.stopPropagation();
     this.photoService.ratePhoto(photo.id, score).subscribe({
       next: (updatedPhoto) => {
-        // Update the photo in the list with new stats
-        const index = this.photos.findIndex(p => p.id === photo.id);
-        if (index !== -1) {
-          this.photos[index] = { ...this.photos[index], ...updatedPhoto };
-          // Animation logic could go here
-        }
+        // A final score removes the photo from the unrated For You feed.
+        this.photos = this.photos.filter(p => p.id !== photo.id);
       },
       error: (err) => console.error(err)
     });
+  }
+
+  onViewerRated(photoId: number) {
+    this.photos = this.photos.filter(p => p.id !== photoId);
   }
 
   @HostListener('window:scroll')

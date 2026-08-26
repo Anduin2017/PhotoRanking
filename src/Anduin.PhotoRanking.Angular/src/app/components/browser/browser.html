@@ -17,8 +17,8 @@
             <span class="sort-label">排序方式:</span>
             <div class="sort-buttons">
                 <button [class.active]="sortBy === 'name'" (click)="changeSort('name')">字母</button>
-                <button [class.active]="sortBy === 'knownRate'" (click)="changeSort('knownRate')">已知度</button>
-                <button [class.active]="sortBy === 'albumScore'" (click)="changeSort('albumScore')">相册分</button>
+                <button [class.active]="sortBy === 'ratedRate'" (click)="changeSort('ratedRate')">已评分比例</button>
+                <button [class.active]="sortBy === 'albumScore'" (click)="changeSort('albumScore')">相册排名</button>
                 <button [class.active]="sortBy === 'photoCount'" (click)="changeSort('photoCount')">照片数</button>
             </div>
         </div>
@@ -40,7 +40,7 @@
                         <div class="folder-name">{{ folder.name }}</div>
                         <div *ngIf="!folder.isParent" class="folder-stats">
                             <span>{{ folder.photoCount }} 照片</span>
-                            <span *ngIf="folder.knownRate > 0"> · {{ folder.knownRate | percent:'1.0-0' }}</span>
+                            <span *ngIf="folder.ratedRate > 0"> · 已评 {{ folder.ratedRate | percent:'1.0-0' }}</span>
                         </div>
                     </div>
                 </div>
@@ -62,12 +62,12 @@
                         </div>
                         <div class="album-card-stats">
                             <div class="stat-item">
-                                <span class="stat-label">相册分</span>
+                                <span class="stat-label">排名分</span>
                                 <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">已知率</span>
-                                <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
+                                <span class="stat-label">已评分</span>
+                                <span class="stat-value">{{ album.ratedRate | percent:'1.1-1' }}</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">照片</span>

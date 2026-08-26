@@ -1,18 +1,22 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 
-import { Advanced } from './advanced';
+import { AdvancedComponent } from './advanced';
 
-describe('Advanced', () => {
-  let component: Advanced;
-  let fixture: ComponentFixture<Advanced>;
+describe('AdvancedComponent', () => {
+  let component: AdvancedComponent;
+  let fixture: ComponentFixture<AdvancedComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Advanced]
+      imports: [AdvancedComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(Advanced);
+    fixture = TestBed.createComponent(AdvancedComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

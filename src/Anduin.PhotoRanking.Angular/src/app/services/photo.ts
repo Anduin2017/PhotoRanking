@@ -6,7 +6,9 @@ export interface Album {
   albumId: string;
   name: string;
   albumScore: number;
-  knownRate: number;
+  ratedRate: number;
+  ratedPhotoCount: number;
+  averageManualScore?: number;
   standardDeviation: number;
   photoCount: number;
   thumbnailPath?: string;
@@ -17,6 +19,9 @@ export interface Album {
 
 export interface GuessScoreResult {
   predictedScore: number;
+  uncertainty?: number | null;
+  novelty?: number | null;
+  modelVersion?: string;
   votes: { [score: number]: number };
 }
 
@@ -25,13 +30,20 @@ export interface Photo {
   filePath: string;
   albumId: string;
   album?: Album;
-  overallScore: number;
-  independentScore?: number;
-  knownness: number;
-  ratingCount: number;
+  manualScore?: number | null;
+  // Legacy wire fields remain optional while old containers/clients roll forward.
+  overallScore?: number;
+  independentScore?: number | null;
+  knownness?: number;
+  ratingCount?: number;
   viewCount: number;
   similarity?: number;
-  estimatedScore?: number;
+  estimatedScore?: number | null;
+  predictedScore?: number | null;
+  displayScore?: number | null;
+  estimatedScoreModelVersion?: string;
+  predictionUncertainty?: number | null;
+  predictionNovelty?: number | null;
   createdAt: string;
 }
 
@@ -45,12 +57,30 @@ export interface GlobalStats {
   ratedCount: number;
   fullyUnknownAlbumCount: number;
   fullyKnownAlbumCount: number;
+  fullyUnratedAlbumCount: number;
+  fullyRatedAlbumCount: number;
   scoreDistribution: { [key: number]: number };
   averagePhotosPerAlbum: number;
-  averageAlbumKnownRate: number;
   overallAverageScore: number;
+  manualAverageScore: number;
+  averageAlbumRatedRate: number;
   indexedPhotoCount: number;
   totalPhotoCount: number;
+  predictionEvaluationCount: number;
+  predictionMeanAbsoluteError?: number;
+  predictionWithinOneRate?: number;
+  activePredictionModelVersion?: string;
+  activePredictionModelTrainedAt?: string;
+  activePredictionModelRatingWatermark?: string;
+  activePredictionModelTrainingPhotoCount?: number;
+  activePredictionCoverageTrainingPhotoCount?: number;
+  activePredictionModelValidationMae?: number;
+  activePredictionModelEnsembleSize?: number;
+  predictionReadyCount: number;
+  activeLearningReadyCount: number;
+  averagePredictionUncertainty?: number;
+  averagePredictionNovelty?: number;
+  activePredictionCoverageCentroidCount?: number;
 }
 
 @Injectable({
@@ -67,8 +97,15 @@ export class PhotoService {
     return `${this.apiBase}/images/${encodeURI(filePath)}`;
   }
 
-  getFeed(size: number = 20, pool: number = 200): Observable<Photo[]> {
-    return this.http.get<Photo[]>(`${this.apiBase}/photos/feed?size=${size}&pool=${pool}`);
+  getFeed(size: number = 20, beforeScore?: number, beforeId?: number): Observable<Photo[]> {
+    let url = `${this.apiBase}/photos/feed?size=${size}`;
+    if (beforeId !== undefined) {
+      url += `&beforeId=${beforeId}`;
+    }
+    if (beforeScore !== undefined) {
+      url += `&beforeScore=${beforeScore}`;
+    }
+    return this.http.get<Photo[]>(url);
   }
 
   getPhoto(id: number): Observable<Photo> {
@@ -94,13 +131,26 @@ export class PhotoService {
     return this.http.get<AlbumDetails>(`${this.apiBase}/albums/${encodeURIComponent(albumId)}?sortBy=${sortBy}`);
   }
 
-  getDiscoverPhotos(mode: string, page: number, pageSize: number, minScore?: number, sort?: string): Observable<Photo[]> {
+  getDiscoverPhotos(
+    mode: string,
+    page: number,
+    pageSize: number,
+    minScore?: number,
+    maxScore?: number,
+    sort?: string,
+    shuffleSeed?: number): Observable<Photo[]> {
     let url = `${this.apiBase}/photos/discover?mode=${mode}&page=${page}&pageSize=${pageSize}`;
     if (minScore !== undefined && minScore !== null) {
       url += `&minScore=${minScore}`;
     }
+    if (maxScore !== undefined && maxScore !== null) {
+      url += `&maxScore=${maxScore}`;
+    }
     if (sort) {
       url += `&sort=${sort}`;
+    }
+    if (shuffleSeed !== undefined) {
+      url += `&shuffleSeed=${shuffleSeed}`;
     }
     return this.http.get<Photo[]>(url);
   }

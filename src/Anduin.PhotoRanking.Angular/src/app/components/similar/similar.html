@@ -14,7 +14,7 @@
             <img [src]="photoService.getImageUrl(targetPhoto.filePath)" class="target-photo-img">
             <div class="target-photo-info">
                 <div class="target-photo-id">ID: {{ targetPhoto.id }}</div>
-                <div class="target-photo-score">Score: {{ targetPhoto.overallScore | number:'1.2-2' }}</div>
+                <div class="target-photo-score">Score: {{ targetPhoto.displayScore | number:'1.2-2' }}</div>
             </div>
         </div>
     </div>
@@ -27,7 +27,7 @@
                 <div class="discover-item-score" *ngIf="photo.similarity !== undefined">
                     Similarity: {{ photo.similarity * 100 | number:'1.1-1' }}%
                 </div>
-                <div class="discover-item-score">Overall Score: {{ photo.overallScore | number:'1.2-2' }}</div>
+                <div class="discover-item-score">Score: {{ photo.displayScore | number:'1.2-2' }}</div>
             </div>
         </div>
     </div>

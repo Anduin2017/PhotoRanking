@@ -1,14 +1,14 @@
 <div class="discover-container main-content">
     <div class="discover-mode-selector">
         <button class="mode-btn" [class.active]="mode === 'waiting'" (click)="setMode('waiting')">
-            <div class="mode-icon">⏳</div>
-            <div class="mode-label">待评</div>
+            <div class="mode-icon">🎲</div>
+            <div class="mode-label">随机</div>
             <div class="mode-desc">随机探索未评分照片</div>
         </button>
-        <button class="mode-btn" [class.active]="mode === 'consolidate'" (click)="setMode('consolidate')">
-            <div class="mode-icon">🔨</div>
-            <div class="mode-label">巩固</div>
-            <div class="mode-desc">对既有评分进行微调</div>
+        <button class="mode-btn" [class.active]="mode === 'work'" (click)="setMode('work')">
+            <div class="mode-icon">🎯</div>
+            <div class="mode-label">干活</div>
+            <div class="mode-desc">AI 挑选最需要新锚点的图</div>
         </button>
         <button class="mode-btn" [class.active]="mode === 'enjoy'" (click)="setMode('enjoy')">
             <div class="mode-icon">☕</div>
@@ -18,26 +18,38 @@
         <button class="mode-btn" [class.active]="mode === 'featured'" (click)="setMode('featured')">
             <div class="mode-icon">💎</div>
             <div class="mode-label">特选</div>
-            <div class="mode-desc">按独立分随机刷</div>
+            <div class="mode-desc">按最终人工分随机刷</div>
         </button>
     </div>
 
     <div *ngIf="mode === 'enjoy'" class="discover-filter-container">
-        <label for="minScoreRange">最低分: {{ minScore | number:'1.1-1' }}</label>
-        <input type="range" 
-               id="minScoreRange" 
-               min="0" 
-               max="6" 
-               step="0.1" 
-               [value]="minScore" 
-               (input)="minScore = +$any($event.target).value"
-               (change)="setMinScore(minScore)">
+        <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
+            <label for="minScoreRange">最低分: {{ minScore | number:'1.1-1' }}</label>
+            <input type="range"
+                   id="minScoreRange"
+                   min="0"
+                   max="6"
+                   step="0.1"
+                   [(ngModel)]="minScore"
+                   (change)="setScoreRange()">
+            <label for="maxScoreRange">最高分: {{ maxScore | number:'1.1-1' }}</label>
+            <input type="range"
+                   id="maxScoreRange"
+                   min="0"
+                   max="6"
+                   step="0.1"
+                   [(ngModel)]="maxScore"
+                   (change)="setScoreRange()">
+            <button class="btn" [disabled]="photos.length === 0" (click)="startEnjoySlideshow()">
+                ▶ 随机幻灯片
+            </button>
+        </div>
     </div>
 
     <div *ngIf="mode === 'featured'" class="discover-filter-container">
         <div class="filter-row" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
             <div>
-                <label>选择独立分:</label>
+                <label>选择最终人工分:</label>
                 <div class="score-selector" style="display: inline-flex; margin-left: 10px;">
                     <button *ngFor="let s of [0, 1, 2, 3, 4, 5, 6]" 
                             class="score-btn" 
@@ -51,10 +63,10 @@
                 <label for="sortBySelect">排序条件:</label>
                 <select id="sortBySelect" [(ngModel)]="sortBy" (change)="setSortBy($event)" style="margin-left: 10px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
                     <option value="random">随机</option>
-                    <option value="overalldesc">整体分降序</option>
-                    <option value="overallasc">整体分升序</option>
-                    <option value="estimateddesc">推测分降序</option>
-                    <option value="estimatedasc">推测分升序</option>
+                    <option value="manualdesc">最终分降序</option>
+                    <option value="manualasc">最终分升序</option>
+                    <option value="predicteddesc">AI 预测降序</option>
+                    <option value="predictedasc">AI 预测升序</option>
                 </select>
             </div>
         </div>
@@ -64,7 +76,13 @@
         <div *ngFor="let photo of photos" class="discover-item" (click)="openViewer(photo.id)">
             <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
             <div class="discover-item-overlay">
-                <div class="discover-item-score">分数: {{ photo.overallScore | number:'1.2-2' }}</div>
+                <div class="discover-item-score" *ngIf="mode === 'work'">
+                    需要锚点 · 覆盖新颖度 {{ photo.predictionNovelty | number:'1.2-2' }}
+                </div>
+                <div class="discover-item-score" *ngIf="mode === 'waiting'">未评分</div>
+                <div class="discover-item-score" *ngIf="mode === 'enjoy' || mode === 'featured'">
+                    最终分: {{ photo.manualScore | number:'1.2-2' }}
+                </div>
             </div>
         </div>
     </div>
@@ -87,10 +105,10 @@
 
         [hasMore]="hasMore"
 
+        [autoPlay]="mode === 'enjoy'"
+
         (requestMore)="loadMore()"
 
         (close)="closeViewer()">
 
     </app-photo-viewer>
-
-

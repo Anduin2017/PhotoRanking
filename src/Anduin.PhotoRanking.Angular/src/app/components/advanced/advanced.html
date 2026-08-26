@@ -21,12 +21,12 @@
                     <span class="global-stat-value">{{ globalStats.waitingCount + globalStats.ratedCount }}</span>
                 </div>
                  <div class="global-stat-card">
-                    <span class="global-stat-title">完全已知相册</span>
-                    <span class="global-stat-value">{{ globalStats.fullyKnownAlbumCount }}</span>
+                    <span class="global-stat-title">全部已评分相册</span>
+                    <span class="global-stat-value">{{ globalStats.fullyRatedAlbumCount }}</span>
                 </div>
                  <div class="global-stat-card">
-                    <span class="global-stat-title">完全未知相册</span>
-                    <span class="global-stat-value">{{ globalStats.fullyUnknownAlbumCount }}</span>
+                    <span class="global-stat-title">尚未评分相册</span>
+                    <span class="global-stat-value">{{ globalStats.fullyUnratedAlbumCount }}</span>
                 </div>
                 <div class="global-stat-card">
                     <span class="global-stat-title">平均相册图片数</span>
@@ -34,15 +34,55 @@
                 </div>
                 <div class="global-stat-card">
                     <span class="global-stat-title">平均相册已评率</span>
-                    <span class="global-stat-value">{{ globalStats.averageAlbumKnownRate | percent:'1.1-1' }}</span>
+                    <span class="global-stat-value">{{ globalStats.averageAlbumRatedRate | percent:'1.1-1' }}</span>
                 </div>
                  <div class="global-stat-card">
-                    <span class="global-stat-title">总体分数均分</span>
-                    <span class="global-stat-value">{{ globalStats.overallAverageScore | number:'1.2-2' }}</span>
+                    <span class="global-stat-title">人工最终分均分</span>
+                    <span class="global-stat-value">{{ globalStats.manualAverageScore | number:'1.2-2' }}</span>
                 </div>
                 <div class="global-stat-card">
                     <span class="global-stat-title">已索引照片</span>
                     <span class="global-stat-value">{{ globalStats.indexedPhotoCount }} / {{ globalStats.totalPhotoCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">真实预测样本</span>
+                    <span class="global-stat-value">{{ globalStats.predictionEvaluationCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">线上预测 MAE</span>
+                    <span class="global-stat-value">{{ globalStats.predictionMeanAbsoluteError != null ? (globalStats.predictionMeanAbsoluteError | number:'1.3-3') : '-' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">误差不超过 1 分</span>
+                    <span class="global-stat-value">{{ globalStats.predictionWithinOneRate != null ? (globalStats.predictionWithinOneRate | percent:'1.1-1') : '-' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">模型训练照片</span>
+                    <span class="global-stat-value">{{ globalStats.activePredictionModelTrainingPhotoCount ?? '-' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">视觉覆盖锚点</span>
+                    <span class="global-stat-value">{{ globalStats.activePredictionCoverageTrainingPhotoCount ?? '-' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">时序留出 MAE</span>
+                    <span class="global-stat-value">{{ globalStats.activePredictionModelValidationMae != null ? (globalStats.activePredictionModelValidationMae | number:'1.3-3') : '-' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">AI 预测已就绪</span>
+                    <span class="global-stat-value">{{ globalStats.predictionReadyCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">主动学习已就绪</span>
+                    <span class="global-stat-value">{{ globalStats.activeLearningReadyCount }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">平均模型分歧</span>
+                    <span class="global-stat-value">{{ globalStats.averagePredictionUncertainty != null ? (globalStats.averagePredictionUncertainty | number:'1.3-3') : '-' }}</span>
+                </div>
+                <div class="global-stat-card">
+                    <span class="global-stat-title">平均覆盖新颖度</span>
+                    <span class="global-stat-value">{{ globalStats.averagePredictionNovelty != null ? (globalStats.averagePredictionNovelty | number:'1.3-3') : '-' }}</span>
                 </div>
             </div>
 
@@ -81,7 +121,7 @@
 
         <!-- 1. Top Albums by Score -->
         <div class="stat-section">
-            <h2 class="stat-section-title">相册分最高的相册</h2>
+            <h2 class="stat-section-title">人工评分最好的相册</h2>
             <div class="stat-grid">
                 <div *ngFor="let album of stats.topAlbumsByScore" class="stat-card album-thumbnail-card"
                      (click)="openAlbum(album.albumId)">
@@ -94,12 +134,16 @@
                         </div>
                         <div class="album-card-stats">
                             <div class="stat-item">
-                                <span class="stat-label">相册分</span>
+                                <span class="stat-label">排名分</span>
                                 <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">已知率</span>
-                                <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
+                                <span class="stat-label">人工均分</span>
+                                <span class="stat-value">{{ album.averageManualScore != null ? (album.averageManualScore | number:'1.2-2') : '-' }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">已评分</span>
+                                <span class="stat-value">{{ album.ratedRate | percent:'1.1-1' }}</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">照片</span>
@@ -114,11 +158,11 @@
             </div>
         </div>
 
-        <!-- 2. Top Albums by Known Rate -->
+        <!-- 2. Top Albums by rating coverage -->
         <div class="stat-section">
-            <h2 class="stat-section-title">已知率最高的相册</h2>
+            <h2 class="stat-section-title">人工评分覆盖率最高的相册</h2>
             <div class="stat-grid">
-                <div *ngFor="let album of stats.topAlbumsByKnownRate" class="stat-card album-thumbnail-card"
+                <div *ngFor="let album of stats.topAlbumsByRatedRate" class="stat-card album-thumbnail-card"
                      (click)="openAlbum(album.albumId)">
                      <img *ngIf="album.thumbnailPath" [src]="photoService.getImageUrl(album.thumbnailPath)" class="album-thumbnail-image" loading="lazy">
                      <div class="album-card-overlay"></div>
@@ -129,12 +173,12 @@
                         </div>
                         <div class="album-card-stats">
                             <div class="stat-item">
-                                <span class="stat-label">相册分</span>
+                                <span class="stat-label">排名分</span>
                                 <span class="stat-value">{{ album.albumScore | number:'1.2-2' }}</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">已知率</span>
-                                <span class="stat-value">{{ album.knownRate | percent:'1.1-1' }}</span>
+                                <span class="stat-label">已评分</span>
+                                <span class="stat-value">{{ album.ratedRate | percent:'1.1-1' }}</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">照片</span>
@@ -145,15 +189,15 @@
                 </div>
             </div>
             <div class="load-more-container">
-                <button class="load-more-btn" (click)="loadMore('albumKnownRate')">Load More</button>
+                <button class="load-more-btn" (click)="loadMore('albumRatedRate')">Load More</button>
             </div>
         </div>
 
         <!-- 3. Top Photos by Score -->
         <div class="stat-section">
-            <h2 class="stat-section-title">整体分最高的照片</h2>
+            <h2 class="stat-section-title">人工最终分最高的照片</h2>
             <div class="photo-grid">
-                <div *ngFor="let photo of stats.topPhotosByScore" class="photo-grid-item" (click)="openViewer(photo.id, stats.topPhotosByScore)">
+                <div *ngFor="let photo of stats.topManualPhotos" class="photo-grid-item" (click)="openViewer(photo.id, stats.topManualPhotos)">
                     <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
                 </div>
             </div>
@@ -162,16 +206,16 @@
             </div>
         </div>
 
-        <!-- 4. Top Photos by Knownness -->
+        <!-- 4. Top unrated predictions -->
         <div class="stat-section">
-            <h2 class="stat-section-title">已知性最高的照片</h2>
+            <h2 class="stat-section-title">AI 最看好的未评分照片</h2>
             <div class="photo-grid">
-                <div *ngFor="let photo of stats.topPhotosByKnownness" class="photo-grid-item" (click)="openViewer(photo.id, stats.topPhotosByKnownness)">
+                <div *ngFor="let photo of stats.topPredictedUnratedPhotos" class="photo-grid-item" (click)="openViewer(photo.id, stats.topPredictedUnratedPhotos)">
                     <img [src]="photoService.getImageUrl(photo.filePath)" loading="lazy">
                 </div>
             </div>
             <div class="load-more-container">
-                <button class="load-more-btn" (click)="loadMore('photoKnownness')">Load More</button>
+                <button class="load-more-btn" (click)="loadMore('predictedPhoto')">Load More</button>
             </div>
         </div>
 

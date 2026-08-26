@@ -15,18 +15,18 @@ export class AdvancedComponent implements OnInit {
   isLoading = true;
   stats: any = {
     topAlbumsByScore: [],
-    topAlbumsByKnownRate: [],
-    topPhotosByScore: [],
-    topPhotosByKnownness: [],
+    topAlbumsByRatedRate: [],
+    topManualPhotos: [],
+    topPredictedUnratedPhotos: [],
     ratingHistory: []
   };
   globalStats: GlobalStats | null = null;
 
   loadedCounts = {
     albumScore: 10,
-    albumKnownRate: 10,
+    albumRatedRate: 10,
     photoScore: 20,
-    photoKnownness: 20,
+    predictedPhoto: 20,
     ratingHistory: 20
   };
 
@@ -50,9 +50,9 @@ export class AdvancedComponent implements OnInit {
         this.isLoading = false;
         // Reset counts based on initial data, or keep defaults if strictly followed
         this.loadedCounts.albumScore = data.topAlbumsByScore?.length || 0;
-        this.loadedCounts.albumKnownRate = data.topAlbumsByKnownRate?.length || 0;
-        this.loadedCounts.photoScore = data.topPhotosByScore?.length || 0;
-        this.loadedCounts.photoKnownness = data.topPhotosByKnownness?.length || 0;
+        this.loadedCounts.albumRatedRate = data.topAlbumsByRatedRate?.length || 0;
+        this.loadedCounts.photoScore = data.topManualPhotos?.length || 0;
+        this.loadedCounts.predictedPhoto = data.topPredictedUnratedPhotos?.length || 0;
         this.loadedCounts.ratingHistory = data.ratingHistory?.length || 0;
       },
       error: (err) => {
@@ -72,17 +72,17 @@ export class AdvancedComponent implements OnInit {
         skip = this.loadedCounts.albumScore;
         endpoint = `albums/top-by-score?skip=${skip}&take=${take}`;
         break;
-      case 'albumKnownRate':
-        skip = this.loadedCounts.albumKnownRate;
-        endpoint = `albums/top-by-knownrate?skip=${skip}&take=${take}`;
+      case 'albumRatedRate':
+        skip = this.loadedCounts.albumRatedRate;
+        endpoint = `albums/top-by-ratedrate?skip=${skip}&take=${take}`;
         break;
       case 'photoScore':
         skip = this.loadedCounts.photoScore;
         endpoint = `photos/top-by-score?skip=${skip}&take=${take}`;
         break;
-      case 'photoKnownness':
-        skip = this.loadedCounts.photoKnownness;
-        endpoint = `photos/top-by-knownness?skip=${skip}&take=${take}`;
+      case 'predictedPhoto':
+        skip = this.loadedCounts.predictedPhoto;
+        endpoint = `photos/top-predicted?skip=${skip}&take=${take}`;
         break;
       case 'ratingHistory':
         skip = this.loadedCounts.ratingHistory;
@@ -97,15 +97,15 @@ export class AdvancedComponent implements OnInit {
         if (section === 'albumScore') {
           this.stats.topAlbumsByScore = [...this.stats.topAlbumsByScore, ...items];
           this.loadedCounts.albumScore += items.length;
-        } else if (section === 'albumKnownRate') {
-          this.stats.topAlbumsByKnownRate = [...this.stats.topAlbumsByKnownRate, ...items];
-          this.loadedCounts.albumKnownRate += items.length;
+        } else if (section === 'albumRatedRate') {
+          this.stats.topAlbumsByRatedRate = [...this.stats.topAlbumsByRatedRate, ...items];
+          this.loadedCounts.albumRatedRate += items.length;
         } else if (section === 'photoScore') {
-          this.stats.topPhotosByScore = [...this.stats.topPhotosByScore, ...items];
+          this.stats.topManualPhotos = [...this.stats.topManualPhotos, ...items];
           this.loadedCounts.photoScore += items.length;
-        } else if (section === 'photoKnownness') {
-          this.stats.topPhotosByKnownness = [...this.stats.topPhotosByKnownness, ...items];
-          this.loadedCounts.photoKnownness += items.length;
+        } else if (section === 'predictedPhoto') {
+          this.stats.topPredictedUnratedPhotos = [...this.stats.topPredictedUnratedPhotos, ...items];
+          this.loadedCounts.predictedPhoto += items.length;
         } else if (section === 'ratingHistory') {
           this.stats.ratingHistory = [...this.stats.ratingHistory, ...items];
           this.loadedCounts.ratingHistory += items.length;

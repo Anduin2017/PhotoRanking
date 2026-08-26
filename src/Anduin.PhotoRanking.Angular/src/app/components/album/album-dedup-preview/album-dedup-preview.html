@@ -34,7 +34,7 @@
         <div class="badge badge-delete" *ngIf="selectedPhotos[group.bestPhoto.id]">🗑 待删除</div>
         <img [src]="photoService.getImageUrl(group.bestPhoto.filePath)" loading="lazy" />
         <div class="photo-info">
-          <div class="score">综合分: <strong>{{ group.bestPhoto.overallScore | number:'1.2-2' }}</strong></div>
+          <div class="score">有效分: <strong>{{ group.bestPhoto.displayScore | number:'1.2-2' }}</strong></div>
           <div class="file-path">{{ group.bestPhoto.filePath }}</div>
         </div>
       </div>
@@ -48,7 +48,7 @@
         <div class="badge badge-delete" *ngIf="selectedPhotos[dup.id]">🗑 待删除</div>
         <img [src]="photoService.getImageUrl(dup.filePath)" loading="lazy" />
         <div class="photo-info">
-          <div class="score">综合分: <strong>{{ dup.overallScore | number:'1.2-2' }}</strong></div>
+          <div class="score">有效分: <strong>{{ dup.displayScore | number:'1.2-2' }}</strong></div>
           <div class="file-path">{{ dup.filePath }}</div>
         </div>
       </div>

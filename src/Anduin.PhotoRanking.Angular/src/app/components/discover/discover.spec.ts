@@ -1,18 +1,22 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 
-import { Discover } from './discover';
+import { DiscoverComponent } from './discover';
 
-describe('Discover', () => {
-  let component: Discover;
-  let fixture: ComponentFixture<Discover>;
+describe('DiscoverComponent', () => {
+  let component: DiscoverComponent;
+  let fixture: ComponentFixture<DiscoverComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Discover]
+      imports: [DiscoverComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(Discover);
+    fixture = TestBed.createComponent(DiscoverComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

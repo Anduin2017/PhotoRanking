@@ -1,12 +1,4 @@
 import { Routes, UrlSegment } from '@angular/router';
-import { FeedComponent } from './components/feed/feed';
-import { DiscoverComponent } from './components/discover/discover';
-import { BrowserComponent } from './components/browser/browser';
-
-import { AlbumComponent } from './components/album/album';
-import { AdvancedComponent } from './components/advanced/advanced';
-import { SimilarComponent } from './components/similar/similar';
-import { SearchComponent } from './components/search/search';
 
 export function browserMatcher(url: UrlSegment[]) {
     if (url.length > 0 && url[0].path === 'browser') {
@@ -20,16 +12,39 @@ export function browserMatcher(url: UrlSegment[]) {
     return null;
 }
 
-import { AlbumDedupPreviewComponent } from './components/album/album-dedup-preview/album-dedup-preview';
-
 export const routes: Routes = [
     { path: '', redirectTo: 'feed', pathMatch: 'full' },
-    { path: 'feed', component: FeedComponent },
-    { path: 'discover', component: DiscoverComponent },
-    { matcher: browserMatcher, component: BrowserComponent },
-    { path: 'advanced', component: AdvancedComponent },
-    { path: 'album/:id', component: AlbumComponent },
-    { path: 'album/:id/dedup', component: AlbumDedupPreviewComponent },
-    { path: 'similar/:id', component: SimilarComponent },
-    { path: 'search', component: SearchComponent },
+    {
+        path: 'feed',
+        loadComponent: () => import('./components/feed/feed').then(m => m.FeedComponent)
+    },
+    {
+        path: 'discover',
+        loadComponent: () => import('./components/discover/discover').then(m => m.DiscoverComponent)
+    },
+    {
+        matcher: browserMatcher,
+        loadComponent: () => import('./components/browser/browser').then(m => m.BrowserComponent)
+    },
+    {
+        path: 'advanced',
+        loadComponent: () => import('./components/advanced/advanced').then(m => m.AdvancedComponent)
+    },
+    {
+        path: 'album/:id',
+        loadComponent: () => import('./components/album/album').then(m => m.AlbumComponent)
+    },
+    {
+        path: 'album/:id/dedup',
+        loadComponent: () => import('./components/album/album-dedup-preview/album-dedup-preview')
+            .then(m => m.AlbumDedupPreviewComponent)
+    },
+    {
+        path: 'similar/:id',
+        loadComponent: () => import('./components/similar/similar').then(m => m.SimilarComponent)
+    },
+    {
+        path: 'search',
+        loadComponent: () => import('./components/search/search').then(m => m.SearchComponent)
+    },
 ];
