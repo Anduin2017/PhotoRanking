@@ -6,7 +6,8 @@ using Aiursoft.Canon;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using Aiursoft.CSTools.Tools;
+using System.Net;
+using System.Net.Sockets;
 
 namespace Anduin.PhotoRanking.Tests;
 
@@ -65,15 +66,32 @@ public static class TestPortAllocator
 {
     private static readonly object AllocationLock = new();
     private static readonly HashSet<int> AllocatedPorts = [];
+    private static int _nextPort = 20_000 + Environment.ProcessId % 8_000;
 
     public static int GetAvailablePort()
     {
         lock (AllocationLock)
         {
-            for (var attempt = 0; attempt < 100; attempt++)
+            // Stay below Linux's default ephemeral range (32768+) so a port released
+            // after probing cannot be stolen immediately by an unrelated outbound
+            // connection while the test database is being migrated.
+            for (var attempt = 0; attempt < 10_000; attempt++)
             {
-                var port = Network.GetAvailablePort();
-                if (AllocatedPorts.Add(port)) return port;
+                var port = 20_000 + _nextPort++ % 10_000;
+                if (!AllocatedPorts.Add(port)) continue;
+
+                try
+                {
+                    using var listener = new TcpListener(IPAddress.Any, port);
+                    listener.Start();
+                    listener.Stop();
+                    return port;
+                }
+                catch (SocketException)
+                {
+                    // Another process owns this candidate; retain it in AllocatedPorts
+                    // and advance so this test process never races on it again.
+                }
             }
         }
 

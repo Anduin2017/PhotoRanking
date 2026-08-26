@@ -50,10 +50,10 @@ public class AdminController : ControllerBase
             p.IndependentScore == null && p.PredictionNovelty != null);
         var averagePredictionUncertainty = await _dbContext.Photos
             .Where(p => p.IndependentScore == null && p.PredictionUncertainty != null)
-            .AverageAsync(p => (double?)p.PredictionUncertainty);
+            .AverageAsync(p => p.PredictionUncertainty);
         var averagePredictionNovelty = await _dbContext.Photos
             .Where(p => p.IndependentScore == null && p.PredictionNovelty != null)
-            .AverageAsync(p => (double?)p.PredictionNovelty);
+            .AverageAsync(p => p.PredictionNovelty);
         
         // 查询已索引的照片数量（有 FeatureVector 的照片）
         var indexedPhotoCount = await _dbContext.Photos.CountAsync(p => p.FeatureVector != null);

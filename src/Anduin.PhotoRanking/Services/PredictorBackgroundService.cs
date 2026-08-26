@@ -1,4 +1,5 @@
 using Anduin.PhotoRanking.Data;
+using Anduin.PhotoRanking.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Anduin.PhotoRanking.Services;
@@ -47,7 +48,7 @@ public class PredictorBackgroundService(
         var state = await context.SystemStates.FirstOrDefaultAsync(ct);
         if (state == null)
         {
-            state = new Anduin.PhotoRanking.Models.SystemState
+            state = new SystemState
             {
                 LastRatingAt = await context.Photos.MaxAsync(p => p.LastRatedAt, ct) ?? DateTime.MinValue
             };

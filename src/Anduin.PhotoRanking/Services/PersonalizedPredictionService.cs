@@ -232,8 +232,12 @@ public sealed class PersonalizedPredictionService(
             for (var i = 0; i < predictablePhotos.Count; i++)
             {
                 predictablePhotos[i].EstimatedScore = outputsByModel[0][i];
-                predictablePhotos[i].PredictionUncertainty = CalculateUncertainty(
-                    outputsByModel.Skip(1).Select(outputs => outputs[i]));
+                var memberScores = new double[outputsByModel.Count - 1];
+                for (var member = 1; member < outputsByModel.Count; member++)
+                {
+                    memberScores[member - 1] = outputsByModel[member][i];
+                }
+                predictablePhotos[i].PredictionUncertainty = CalculateUncertainty(memberScores);
                 predictablePhotos[i].PredictionNovelty = coverageOutputs == null
                     ? null
                     : CalculateNovelty(coverageOutputs[i].Distances);

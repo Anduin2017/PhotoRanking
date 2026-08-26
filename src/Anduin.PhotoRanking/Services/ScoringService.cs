@@ -124,7 +124,7 @@ public class ScoringService
 
         var globalAverage = await _context.Photos
             .Where(p => p.IndependentScore != null)
-            .AverageAsync(p => (double?)p.IndependentScore) ?? 3.0;
+            .AverageAsync(p => p.IndependentScore) ?? 3.0;
 
         ApplyAlbumSummary(
             album,
@@ -147,7 +147,7 @@ public class ScoringService
     {
         var globalAverage = await _context.Photos
             .Where(p => p.IndependentScore != null)
-            .AverageAsync(p => (double?)p.IndependentScore) ?? 3.0;
+            .AverageAsync(p => p.IndependentScore) ?? 3.0;
 
         var summaries = await _context.Photos
             .GroupBy(p => p.AlbumId)

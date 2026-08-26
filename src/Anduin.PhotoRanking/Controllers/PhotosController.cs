@@ -57,7 +57,7 @@ public class PhotosController : ControllerBase
             query = query.Where(p =>
                 p.EstimatedScore == null ||
                 p.EstimatedScore < beforeScore.Value ||
-                (p.EstimatedScore == beforeScore.Value && p.Id > beforeId.Value));
+                (p.EstimatedScore <= beforeScore.Value && p.Id > beforeId.Value));
         }
         else if (beforeId.HasValue)
         {
@@ -104,7 +104,7 @@ public class PhotosController : ControllerBase
             var randomPage = await _context.Photos
                 .Include(p => p.Album)
                 .Where(p => p.IndependentScore == null)
-                .OrderBy(p => (((long)p.Id * 1103515245L) + stableSeed) % int.MaxValue)
+                .OrderBy(p => ((p.Id * 1103515245L) + stableSeed) % int.MaxValue)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
