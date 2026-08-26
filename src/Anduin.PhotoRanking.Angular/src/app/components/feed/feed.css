@@ -22,6 +22,10 @@
     box-shadow: var(--shadow-lg);
 }
 
+.feed-card-rated {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent), var(--shadow);
+}
+
 .feed-card-image {
     width: 100%;
     /* aspect-ratio: 1;  Removed to allow natural height if needed, original css had it */
@@ -69,6 +73,38 @@
     text-align: center;
 }
 
+.rating-comparison {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.rating-comparison-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.rating-comparison-item.prediction {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.rating-comparison-label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.rating-comparison-value {
+    color: var(--text-primary);
+    font-size: 1.35rem;
+}
+
 .rating-buttons-inline {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 48px));
@@ -99,6 +135,19 @@
     border-color: var(--primary);
     transform: scale(1.1);
     box-shadow: 0 0 15px var(--primary);
+}
+
+.rating-btn-inline.selected {
+    color: #fff;
+    border-color: var(--primary);
+    background: var(--gradient-primary);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+@media (max-width: 480px) {
+    .rating-comparison {
+        grid-template-columns: 1fr;
+    }
 }
 
 .loading-indicator {

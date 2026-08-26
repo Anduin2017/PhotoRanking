@@ -1,5 +1,5 @@
 <div class="feed-container">
-    <div *ngFor="let photo of photos" class="feed-card">
+    <div *ngFor="let photo of photos" class="feed-card" [class.feed-card-rated]="photo.manualScore != null">
         <img [src]="photoService.getImageUrl(photo.filePath)" class="feed-card-image" loading="lazy" (click)="openViewer(photo.id)">
         <div class="feed-card-info">
             <div class="feed-card-album">
@@ -10,10 +10,26 @@
             </div>
 
             <div class="feed-card-rating">
-                <div class="rating-prompt-inline">为这张照片打分</div>
+                <div class="rating-comparison" *ngIf="photo.manualScore != null">
+                    <div class="rating-comparison-item">
+                        <span class="rating-comparison-label">你的最终分</span>
+                        <strong class="rating-comparison-value">{{ photo.manualScore | number:'1.0-0' }}</strong>
+                    </div>
+                    <div class="rating-comparison-item prediction">
+                        <span class="rating-comparison-label">AI 评分前预测</span>
+                        <strong class="rating-comparison-value">
+                            {{ photo.predictedScore != null ? (photo.predictedScore | number:'1.2-2') : '—' }}
+                        </strong>
+                    </div>
+                </div>
+                <div class="rating-prompt-inline">
+                    {{ photo.manualScore == null ? '为这张照片打分' : '评分已保存；点数字可以纠正' }}
+                </div>
                 <div class="rating-buttons-inline">
                     <button *ngFor="let score of scoreOptions"
                             class="rating-btn-inline"
+                            [class.selected]="photo.manualScore === score"
+                            [attr.aria-pressed]="photo.manualScore === score"
                             [attr.aria-label]="'打 ' + score + ' 分'"
                             [attr.title]="score === 0 ? '0 分：最不喜欢' : (score === 6 ? '6 分：最喜欢' : score + ' 分')"
                             (click)="onRate(photo, score, $event)">

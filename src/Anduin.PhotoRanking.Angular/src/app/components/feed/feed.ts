@@ -83,15 +83,27 @@ export class FeedComponent implements OnInit {
     event.stopPropagation();
     this.photoService.ratePhoto(photo.id, score).subscribe({
       next: (updatedPhoto) => {
-        // A final score removes the photo from the unrated For You feed.
-        this.photos = this.photos.filter(p => p.id !== photo.id);
+        this.revealRatedPhoto(updatedPhoto);
       },
       error: (err) => console.error(err)
     });
   }
 
-  onViewerRated(photoId: number) {
-    this.photos = this.photos.filter(p => p.id !== photoId);
+  onViewerRated(updatedPhoto: Photo) {
+    this.revealRatedPhoto(updatedPhoto);
+  }
+
+  private revealRatedPhoto(updatedPhoto: Photo) {
+    this.photos = this.photos.map(photo => photo.id === updatedPhoto.id
+      ? {
+          ...photo,
+          ...updatedPhoto,
+          album: updatedPhoto.album ?? photo.album,
+          manualScore: updatedPhoto.manualScore ?? updatedPhoto.independentScore ?? photo.manualScore,
+          predictedScore: updatedPhoto.predictedScore ?? updatedPhoto.estimatedScore ??
+            photo.predictedScore ?? photo.estimatedScore
+        }
+      : photo);
   }
 
   @HostListener('window:scroll')

@@ -21,7 +21,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   @Input() autoPlay = false;
   @Output() close = new EventEmitter<void>();
   @Output() requestMore = new EventEmitter<void>();
-  @Output() rated = new EventEmitter<number>();
+  @Output() rated = new EventEmitter<Photo>();
 
   @ViewChild('swiperContainer') swiperContainer!: ElementRef;
 
@@ -260,7 +260,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         } else if (this.hasMore) {
           this.requestMore.emit();
         }
-        this.rated.emit(updatedPhoto.id);
+        this.rated.emit(updatedPhoto);
       },
       error: (err) => {
         console.error(err);
