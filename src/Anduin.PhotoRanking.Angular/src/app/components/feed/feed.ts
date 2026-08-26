@@ -12,6 +12,7 @@ import { RouterModule, ActivatedRoute } from '@angular/router';
   styleUrl: './feed.css',
 })
 export class FeedComponent implements OnInit {
+  readonly scoreOptions = [0, 1, 2, 3, 4, 5, 6];
   photos: Photo[] = [];
   isLoading = false;
   hasMore = true;

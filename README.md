@@ -59,7 +59,7 @@ The docker image has the following context:
 
 The product has two photo scores:
 
-1. **Final manual score** (`IndependentScore`, exposed as `manualScore`) is the user's source of truth. A new rating replaces the previous value; repeated ratings are corrections, never votes to average. The app presents 2–6 while the API continues to accept historic 0–6 data.
+1. **Final manual score** (`IndependentScore`, exposed as `manualScore`) is the user's source of truth on the complete 0–6 scale. A new rating replaces the previous value; repeated ratings are corrections, never votes to average.
 2. **AI prediction** (`EstimatedScore`, exposed as `predictedScore`) is the model's estimate for an unrated photo. The For You feed contains only unrated photos and is ordered by this value descending.
 
 The predictor is a versioned regression ensemble trained from one row per rated photo: the current 512-dimensional CLIP embedding and the current final manual score. One full-data model produces the score while five deterministic bootstrap members measure disagreement. A separate coverage model measures distance from visually represented rating anchors. Disagreement and coverage distance are active-learning metadata, not extra photo scores. Rating history, rating count, album score, knownness, and old overall score are not model inputs. After a quiet period, a new model is trained and predictions are refreshed in resumable batches for unrated photos only.

@@ -12,8 +12,10 @@
             <div class="feed-card-rating">
                 <div class="rating-prompt-inline">为这张照片打分</div>
                 <div class="rating-buttons-inline">
-                    <button *ngFor="let score of [2,3,4,5,6]"
+                    <button *ngFor="let score of scoreOptions"
                             class="rating-btn-inline"
+                            [attr.aria-label]="'打 ' + score + ' 分'"
+                            [attr.title]="score === 0 ? '0 分：最不喜欢' : (score === 6 ? '6 分：最喜欢' : score + ' 分')"
                             (click)="onRate(photo, score, $event)">
                         {{ score }}
                     </button>

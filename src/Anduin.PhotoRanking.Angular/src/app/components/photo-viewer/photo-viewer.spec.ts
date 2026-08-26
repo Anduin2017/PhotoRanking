@@ -39,4 +39,18 @@ describe('PhotoViewerComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('offers the complete zero-to-six rating scale', () => {
+    expect(component.scoreOptions).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it('accepts zero and one as keyboard ratings', () => {
+    const ratedScores: number[] = [];
+    component.ratePhoto = (score: number) => ratedScores.push(score);
+
+    component.handleKeyboardEvent(new KeyboardEvent('keydown', { key: '0' }));
+    component.handleKeyboardEvent(new KeyboardEvent('keydown', { key: '1' }));
+
+    expect(ratedScores).toEqual([0, 1]);
+  });
 });

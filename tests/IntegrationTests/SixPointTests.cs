@@ -59,6 +59,32 @@ public class SixPointTests
     }
 
     [TestMethod]
+    public async Task ZeroAndOneAreValidFinalScores()
+    {
+        var photoId = await SeedPhotoAsync("low-ratings", null, 3.25, "test-model-v1", 0, false);
+
+        var zeroResponse = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 0 });
+        var oneResponse = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 1 });
+
+        Assert.AreEqual(HttpStatusCode.OK, zeroResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, oneResponse.StatusCode);
+
+        using var scope = _server!.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var photo = await context.Photos.SingleAsync(p => p.Id == photoId);
+        var logs = await context.RatingLogs
+            .Where(l => l.PhotoId == photoId)
+            .OrderBy(l => l.Id)
+            .ToListAsync();
+
+        Assert.AreEqual(1.0, photo.IndependentScore);
+        Assert.AreEqual(1.0, photo.OverallScore);
+        Assert.HasCount(2, logs);
+        Assert.AreEqual(0, logs[0].Score);
+        Assert.AreEqual(1, logs[1].Score);
+    }
+
+    [TestMethod]
     public async Task ReRatingOverwritesTheFinalScoreWithoutAveragingOrLocking()
     {
         var photoId = await SeedPhotoAsync("correction", 2, 4.8, "old-model", 999, true);

@@ -14,6 +14,7 @@ import { Router } from '@angular/router';
   styleUrl: './photo-viewer.css',
 })
 export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, OnChanges {
+  readonly scoreOptions = [0, 1, 2, 3, 4, 5, 6];
   @Input() startPhotoId: number | null = null;
   @Input() photos: Photo[] = [];
   @Input() hasMore = false;
@@ -366,16 +367,22 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
+    const target = event.target;
+    if (target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)) {
+      return;
+    }
+
     if (event.key === 'ArrowRight') {
       this.swiper?.slideNext();
     } else if (event.key === 'ArrowLeft') {
       this.swiper?.slidePrev();
     } else if (event.key === 'Escape') {
       this.onClose();
-    } else if (event.key >= '2' && event.key <= '5') {
+    } else if (event.key >= '0' && event.key <= '6') {
       this.ratePhoto(parseInt(event.key));
-    } else if (event.key === '6') {
-      this.ratePhoto(6);
     }
   }
 }

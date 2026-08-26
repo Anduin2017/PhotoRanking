@@ -50,11 +50,18 @@
         </div>
 
         <div class="viewer-rating">
-            <button class="rating-btn" *ngFor="let score of [2,3,4,5,6]" (click)="ratePhoto(score, $event)" [class.last-rated]="isRated(score)">
-                {{ score }}
-            </button>
+            <div class="rating-score-buttons">
+                <button class="rating-btn"
+                        *ngFor="let score of scoreOptions"
+                        (click)="ratePhoto(score, $event)"
+                        [class.last-rated]="isRated(score)"
+                        [attr.aria-label]="'打 ' + score + ' 分'"
+                        [attr.title]="score === 0 ? '0 分：最不喜欢' : (score === 6 ? '6 分：最喜欢' : score + ' 分')">
+                    {{ score }}
+                </button>
+            </div>
 
-            <div style="width: 1px; height: 40px; background: var(--border); margin: 0 0.5rem;"></div>
+            <div class="rating-separator" aria-hidden="true"></div>
 
             <button class="rating-btn" (click)="toggleFlip($event)" [class.active]="flipped" title="镜像翻转">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;">

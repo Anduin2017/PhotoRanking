@@ -24,4 +24,8 @@ describe('FeedComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('offers the complete zero-to-six rating scale', () => {
+    expect(component.scoreOptions).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
 });
