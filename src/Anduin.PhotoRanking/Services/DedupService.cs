@@ -117,9 +117,9 @@ public class DedupService
             var groupPhotos = groupIndices.Select(i => validPhotos[i]).ToList();
 
             // Find the "Best" photo to place first.
-            // Heuristic: Highest OverallScore (if identical, largest file size)
+            // Prefer the final manual score; use the prediction only for unrated duplicates.
             var sortedGroup = groupPhotos
-                .OrderByDescending(p => p.OverallScore)
+                .OrderByDescending(p => p.IndependentScore ?? p.EstimatedScore ?? -1)
                 .ThenByDescending(p => p.FileSize)
                 .ToArray();
 

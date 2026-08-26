@@ -39,6 +39,21 @@ public class AdminController : ControllerBase
 
         var totalPhotos = waitingCount + photoScores.Count;
         var totalAlbums = albumStats.Count;
+        var predictionErrors = await _dbContext.RatingLogs
+            .Where(r => !r.IsCorrection && r.PredictionAtRating != null)
+            .Select(r => Math.Abs(r.PredictionAtRating!.Value - r.Score))
+            .ToListAsync();
+        var activeModel = await _dbContext.PredictionModels.AsNoTracking().FirstOrDefaultAsync(x => x.Id == 1);
+        var predictionReadyCount = await _dbContext.Photos.CountAsync(p =>
+            p.IndependentScore == null && p.EstimatedScore != null);
+        var activeLearningReadyCount = await _dbContext.Photos.CountAsync(p =>
+            p.IndependentScore == null && p.PredictionNovelty != null);
+        var averagePredictionUncertainty = await _dbContext.Photos
+            .Where(p => p.IndependentScore == null && p.PredictionUncertainty != null)
+            .AverageAsync(p => (double?)p.PredictionUncertainty);
+        var averagePredictionNovelty = await _dbContext.Photos
+            .Where(p => p.IndependentScore == null && p.PredictionNovelty != null)
+            .AverageAsync(p => (double?)p.PredictionNovelty);
         
         // 查询已索引的照片数量（有 FeatureVector 的照片）
         var indexedPhotoCount = await _dbContext.Photos.CountAsync(p => p.FeatureVector != null);
@@ -49,12 +64,33 @@ public class AdminController : ControllerBase
             RatedCount = photoScores.Count,
             FullyUnknownAlbumCount = albumStats.Count(a => a.KnownRate < 0.001),
             FullyKnownAlbumCount = albumStats.Count(a => a.KnownRate > 0.999),
+            FullyUnratedAlbumCount = albumStats.Count(a => a.KnownRate < 0.001),
+            FullyRatedAlbumCount = albumStats.Count(a => a.KnownRate > 0.999),
             AveragePhotosPerAlbum = totalAlbums > 0 ? (double)totalPhotos / totalAlbums : 0,
             AverageAlbumKnownRate = totalAlbums > 0 ? albumStats.Average(a => a.KnownRate) : 0,
             OverallAverageScore = photoScores.Any() ? photoScores.Average() : 0,
+            AverageAlbumRatedRate = totalAlbums > 0 ? albumStats.Average(a => a.KnownRate) : 0,
+            ManualAverageScore = photoScores.Any() ? photoScores.Average() : 0,
             ScoreDistribution = new Dictionary<int, int>(),
             IndexedPhotoCount = indexedPhotoCount,
-            TotalPhotoCount = totalPhotos
+            TotalPhotoCount = totalPhotos,
+            PredictionEvaluationCount = predictionErrors.Count,
+            PredictionMeanAbsoluteError = predictionErrors.Count > 0 ? predictionErrors.Average() : null,
+            PredictionWithinOneRate = predictionErrors.Count > 0
+                ? predictionErrors.Count(x => x <= 1.0) / (double)predictionErrors.Count
+                : null,
+            ActivePredictionModelVersion = activeModel?.Version,
+            ActivePredictionModelTrainedAt = activeModel?.TrainedAt,
+            ActivePredictionModelRatingWatermark = activeModel?.TrainingRatingWatermark,
+            ActivePredictionModelTrainingPhotoCount = activeModel?.TrainingPhotoCount,
+            ActivePredictionCoverageTrainingPhotoCount = activeModel?.CoverageTrainingPhotoCount,
+            ActivePredictionModelValidationMae = activeModel?.ValidationMeanAbsoluteError,
+            ActivePredictionModelEnsembleSize = activeModel?.EnsembleSize,
+            PredictionReadyCount = predictionReadyCount,
+            ActiveLearningReadyCount = activeLearningReadyCount,
+            AveragePredictionUncertainty = averagePredictionUncertainty,
+            AveragePredictionNovelty = averagePredictionNovelty,
+            ActivePredictionCoverageCentroidCount = activeModel?.CoverageCentroidCount
         };
 
         // Initialize 0-6 keys

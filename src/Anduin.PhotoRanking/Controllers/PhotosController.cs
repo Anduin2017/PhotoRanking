@@ -12,6 +12,7 @@ public class PhotosController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly ScoringService _scoringService;
+    private readonly PersonalizedPredictionService _predictionService;
     private readonly ILogger<PhotosController> _logger;
     private readonly ImageAnalysisService _imageAnalysis;
 
@@ -20,49 +21,62 @@ public class PhotosController : ControllerBase
     public PhotosController(
         AppDbContext context, 
         ScoringService scoringService, 
+        PersonalizedPredictionService predictionService,
         ILogger<PhotosController> logger,
         ImageAnalysisService imageAnalysis,
         IConfiguration configuration)
     {
         _context = context;
         _scoringService = scoringService;
+        _predictionService = predictionService;
         _logger = logger;
         _imageAnalysis = imageAnalysis;
         _configuration = configuration;
     }
 
     /// <summary>
-    /// 获取首页照片流（基于推测分的高质量推荐）
-    /// 策略：从库中选出推测分最高的前 200 张未评分照片，随机打乱后返回。
+    /// 获取首页 For You 照片流。只返回未评分照片，按个人预测分稳定降序。
     /// </summary>
     [HttpGet("feed")]
     public async Task<ActionResult<List<Photo>>> GetFeed(
-        [FromQuery] int take = 20)
+        [FromQuery] int page = 1,
+        [FromQuery] int size = 20,
+        [FromQuery] int? take = null,
+        [FromQuery] double? beforeScore = null,
+        [FromQuery] int? beforeId = null)
     {
-        // 1. 获取推测分最高的前 200 张未评分照片
-        var topCandidates = await _context.Photos
-            .Include(p => p.Album)
-            .Where(p => p.IndependentScore == null)
-            .OrderByDescending(p => p.EstimatedScore)
-            .Take(200)
-            .ToListAsync();
+        var pageSize = Math.Clamp(take ?? size, 1, 100);
+        page = Math.Max(1, page);
 
-        if (topCandidates.Count == 0)
+        var query = _context.Photos
+            .Include(p => p.Album)
+            .Where(p => p.IndependentScore == null);
+
+        if (beforeScore.HasValue && beforeId.HasValue)
         {
-            // 如果没有带推测分的，退化为纯随机
-            return await _context.Photos
-                .Include(p => p.Album)
-                .Where(p => p.IndependentScore == null)
-                .OrderBy(p => EF.Functions.Random())
-                .Take(take)
-                .ToListAsync();
+            query = query.Where(p =>
+                p.EstimatedScore == null ||
+                p.EstimatedScore < beforeScore.Value ||
+                (p.EstimatedScore == beforeScore.Value && p.Id > beforeId.Value));
+        }
+        else if (beforeId.HasValue)
+        {
+            // Null predictions sort last. This keeps a new installation pageable while
+            // its first model is still training and filling the prediction cache.
+            query = query.Where(p => p.EstimatedScore == null && p.Id > beforeId.Value);
         }
 
-        // 2. 内存随机打乱
-        var shuffled = topCandidates.OrderBy(_ => Random.Shared.Next()).ToList();
+        var orderedQuery = query
+            .OrderByDescending(p => p.EstimatedScore)
+            .ThenBy(p => p.Id);
 
-        // 3. 返回请求的数量
-        return Ok(shuffled.Take(take).ToList());
+        var photos = await (beforeId.HasValue
+                ? orderedQuery
+                : orderedQuery.Skip((page - 1) * pageSize))
+            .Take(pageSize)
+            .ToListAsync();
+
+        return Ok(photos);
     }
 
     /// <summary>
@@ -74,119 +88,125 @@ public class PhotosController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
         [FromQuery] double? minScore = null,
+        [FromQuery] double? maxScore = null,
+        [FromQuery] int? shuffleSeed = null,
         [FromQuery] string sort = "random")
     {
-        List<Photo> candidates;
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var normalizedMode = mode.ToLowerInvariant();
+        var stableSeed = (int)(Math.Abs((long)(shuffleSeed ?? Random.Shared.Next())) % int.MaxValue);
 
-        // 根据模式选择候选照片
-        switch (mode.ToLower())
+        // Random browsing is deterministic within one client session, so infinite scroll
+        // does not repeat the same photos on adjacent pages.
+        if (normalizedMode is "waiting" or "consolidate")
         {
-            case "waiting": // 待打分：纯随机
-                candidates = await _context.Photos
+            var randomPage = await _context.Photos
+                .Include(p => p.Album)
+                .Where(p => p.IndependentScore == null)
+                .OrderBy(p => (((long)p.Id * 1103515245L) + stableSeed) % int.MaxValue)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            return Ok(randomPage);
+        }
+
+        if (normalizedMode == "work")
+        {
+            var uncertainCandidates = await _context.Photos
+                .Include(p => p.Album)
+                .Where(p => p.IndependentScore == null && p.PredictionNovelty != null)
+                .OrderByDescending(p => p.PredictionNovelty)
+                .ThenByDescending(p => p.PredictionUncertainty)
+                .Take(10_000)
+                .ToListAsync();
+
+            if (uncertainCandidates.Count == 0)
+            {
+                uncertainCandidates = await _context.Photos
+                    .Include(p => p.Album)
+                    .Where(p => p.IndependentScore == null && p.PredictionUncertainty != null)
+                    .OrderByDescending(p => p.PredictionUncertainty)
+                    .Take(10_000)
+                    .ToListAsync();
+            }
+
+            if (uncertainCandidates.Count == 0)
+            {
+                var fallback = await _context.Photos
                     .Include(p => p.Album)
                     .Where(p => p.IndependentScore == null)
-                    .OrderBy(p => EF.Functions.Random())
-                    .Take(500)
+                    .OrderByDescending(p => p.EstimatedScore)
+                    .ThenBy(p => p.Id)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
                     .ToListAsync();
-                break;
+                return Ok(fallback);
+            }
 
-            case "consolidate": // 巩固：尽可能将已知率较高的相册里还未评分的照片进行评分
-                var topAlbums = await _context.Albums
-                    .Where(a => a.KnownRate < 1)
-                    .OrderByDescending(a => a.KnownRate)
-                    .Take(35)
-                    .ToListAsync();
-
-                var albumIds = topAlbums.Select(a => a.AlbumId).ToList();
-
-                candidates = await _context.Photos
-                    .Include(p => p.Album)
-                    .Where(p => albumIds.Contains(p.AlbumId) && p.IndependentScore == null)
-                    .ToListAsync();
-
-                if (candidates.Count == 0)
-                {
-                    candidates = await _context.Photos
-                        .Include(p => p.Album)
-                        .Where(p => p.IndependentScore == null)
-                        .OrderByDescending(p => p.Album.KnownRate)
-                        .Take(500)
-                        .ToListAsync();
-                }
-                break;
-
-            case "enjoy": // 享受：只有设置的分数综合分以上的照片
-                var actualMinScore = minScore ?? 3.0;
-                candidates = await _context.Photos
-                    .Include(p => p.Album)
-                    .Where(p => p.OverallScore >= actualMinScore)
-                    .ToListAsync();
-                break;
-
-            case "featured": // 特选：按独立分随机刷
-                var targetScore = minScore ?? 5.0;
-                candidates = await _context.Photos
-                    .Include(p => p.Album)
-                    .Where(p => p.IndependentScore >= targetScore - 0.0001 && p.IndependentScore <= targetScore + 0.0001)
-                    .ToListAsync();
-                break;
-
-            default:
-                return BadRequest("Invalid mode");
-        }
-
-        if (candidates.Count == 0)
-        {
-            return Ok(new List<Photo>());
-        }
-
-        if (mode.ToLower() == "featured" && sort.ToLower() != "random")
-        {
-            candidates = sort.ToLower() switch
-            {
-                "overalldesc" => candidates.OrderByDescending(p => p.OverallScore).ToList(),
-                "overallasc" => candidates.OrderBy(p => p.OverallScore).ToList(),
-                "estimateddesc" => candidates.OrderByDescending(p => p.EstimatedScore ?? -1).ToList(),
-                "estimatedasc" => candidates.OrderBy(p => p.EstimatedScore ?? -1).ToList(),
-                _ => candidates
-            };
-
-            var sortedPagePhotos = candidates
+            // Visual novelty finds regions poorly covered by existing manual anchors;
+            // ensemble disagreement is the fallback/tie-breaker. The first pass takes at
+            // most one photo per album, and repeated views lower priority.
+            var priorityOrdered = uncertainCandidates
+                .OrderByDescending(p => (p.PredictionNovelty ?? p.PredictionUncertainty ?? 0) /
+                                        Math.Sqrt(p.ViewCount + 1.0))
+                .ThenByDescending(p => p.PredictionUncertainty)
+                .ThenBy(p => StableShuffleKey(p.Id, stableSeed))
+                .ToList();
+            var diverseFirstPass = priorityOrdered
+                .GroupBy(p => p.AlbumId)
+                .Select(group => group.First())
+                .OrderByDescending(p => (p.PredictionNovelty ?? p.PredictionUncertainty ?? 0) /
+                                        Math.Sqrt(p.ViewCount + 1.0))
+                .ThenByDescending(p => p.PredictionUncertainty)
+                .ThenBy(p => StableShuffleKey(p.Id, stableSeed))
+                .ToList();
+            var firstPassIds = diverseFirstPass.Select(p => p.Id).ToHashSet();
+            var workQueue = diverseFirstPass
+                .Concat(priorityOrdered.Where(p => !firstPassIds.Contains(p.Id)))
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
-
-            return Ok(sortedPagePhotos);
+            return Ok(workQueue);
         }
 
-        // 定义权重选择器
-        double WeightSelector(Photo p) => mode.ToLower() switch
+        List<Photo> candidates;
+        if (normalizedMode == "enjoy")
         {
-            "waiting" => 100 - p.Knownness + 1,
-            "consolidate" => p.Album.KnownRate * 100 + 1,
-            "enjoy" => Math.Pow(p.OverallScore + 1, 2) / (p.ViewCount + 1),
-            "featured" => 1.0 / (p.ViewCount + 1), // 特选模式下：浏览次数越少权重越高
-            _ => 1.0
+            var lower = Math.Clamp(minScore ?? 4.0, 0, 6);
+            var upper = Math.Clamp(maxScore ?? 6.0, lower, 6);
+            candidates = await _context.Photos
+                .Include(p => p.Album)
+                .Where(p => p.IndependentScore >= lower && p.IndependentScore <= upper)
+                .ToListAsync();
+        }
+        else if (normalizedMode == "featured")
+        {
+            var targetScore = Math.Clamp(minScore ?? 5.0, 0, 6);
+            candidates = await _context.Photos
+                .Include(p => p.Album)
+                .Where(p => p.IndependentScore >= targetScore - 0.0001 &&
+                            p.IndependentScore <= targetScore + 0.0001)
+                .ToListAsync();
+        }
+        else
+        {
+            return BadRequest("Invalid mode");
+        }
+
+        IEnumerable<Photo> ordered = sort.ToLowerInvariant() switch
+        {
+            "manualdesc" or "overalldesc" => candidates.OrderByDescending(p => p.IndependentScore).ThenBy(p => p.Id),
+            "manualasc" or "overallasc" => candidates.OrderBy(p => p.IndependentScore).ThenBy(p => p.Id),
+            "predicteddesc" or "estimateddesc" => candidates.OrderByDescending(p => p.EstimatedScore ?? -1).ThenBy(p => p.Id),
+            "predictedasc" or "estimatedasc" => candidates.OrderBy(p => p.EstimatedScore ?? -1).ThenBy(p => p.Id),
+            _ => candidates.OrderBy(p => StableShuffleKey(p.Id, stableSeed))
         };
 
-        // 使用加权随机选择
-        var totalToSelect = page * pageSize;
-        var selectedPhotos = new List<Photo>();
-        var limit = Math.Min(totalToSelect, candidates.Count);
-        for (int i = 0; i < limit; i++)
-        {
-            var photo = _scoringService.WeightedRandomSelect(candidates, WeightSelector);
-            selectedPhotos.Add(photo);
-            candidates.Remove(photo);
-        }
-
-        // 只返回当前页的照片
-        var currentPagePhotos = selectedPhotos
+        return Ok(ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
-
-        return Ok(currentPagePhotos);
+            .ToList());
     }
 
     /// <summary>
@@ -197,7 +217,6 @@ public class PhotosController : ControllerBase
     {
         var photo = await _context.Photos
             .Include(p => p.Album)
-            .Include(p => p.RatingLogs)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (photo == null)
@@ -205,26 +224,25 @@ public class PhotosController : ControllerBase
             return NotFound();
         }
 
-        // 计算历史独立分均分
-        var avgIndependentScore = photo.RatingLogs.Any()
-            ? photo.RatingLogs.Average(r => r.Score)
-            : (double?)null;
-
         return Ok(new
         {
             photo.Id,
             photo.FilePath,
             photo.AlbumId,
             photo.IndependentScore,
+            photo.ManualScore,
+            photo.EstimatedScore,
+            photo.PredictedScore,
+            photo.EstimatedScoreModelVersion,
+            photo.PredictionUncertainty,
+            photo.PredictionNovelty,
+            photo.DisplayScore,
+            // Legacy fields are returned for old clients but no longer drive behavior.
             photo.OverallScore,
-            photo.Knownness,
             photo.RatingCount,
-            photo.IsFixed,
             photo.ViewCount,
             photo.LastRatedAt,
-            photo.Album,
-            AvgIndependentScore = avgIndependentScore,
-            RatingHistory = photo.RatingLogs.OrderByDescending(r => r.RatedAt).Take(10)
+            photo.Album
         });
     }
 
@@ -278,10 +296,10 @@ public class PhotosController : ControllerBase
             return NotFound();
         }
 
-        // 按已知性正相关、整体分正相关选择
+        // 同相册浏览只依据最终人工分或预测分，并降低重复浏览权重。
         var nextPhoto = _scoringService.WeightedRandomSelect(albumPhotos, p =>
         {
-            return p.Knownness * Math.Pow(p.OverallScore, 2);
+            return Math.Pow((p.IndependentScore ?? p.EstimatedScore ?? 0) + 1, 2) / (p.ViewCount + 1);
         });
 
         return Ok(nextPhoto);
@@ -328,7 +346,7 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 根据相似照片猜测独立分（使用分层KNN平衡算法）
+    /// 使用当前个人化模型预测最终人工分。
     /// </summary>
     [HttpGet("{id}/guess-score")]
     public async Task<ActionResult<object>> GuessScore(int id)
@@ -345,12 +363,22 @@ public class PhotosController : ControllerBase
             return BadRequest("Could not ensure feature vector for this photo.");
         }
 
-        var result = await _scoringService.GuessScoreBalancedInternal(targetPhoto, vector);
+        var result = await _predictionService.PredictAsync(vector, HttpContext.RequestAborted);
+        if (result == null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "个人化预测模型尚未完成训练，请稍后再试。"
+            });
+        }
 
         return Ok(new
         {
-            predictedScore = result.PredictedScore,
-            votes = result.Votes
+            predictedScore = result.Score,
+            uncertainty = result.Uncertainty,
+            novelty = result.Novelty,
+            modelVersion = result.ModelVersion,
+            votes = new Dictionary<int, double>() // 旧客户端兼容
         });
     }
 
@@ -411,7 +439,7 @@ public class PhotosController : ControllerBase
     [HttpGet("stats/top")]
     public async Task<ActionResult<object>> GetTopStats()
     {
-        var topAlbumsByKnownRate = await _context.Albums
+        var topAlbumsByRatedRate = await _context.Albums
             .OrderByDescending(a => a.KnownRate)
             .Take(10)
             .ToListAsync();
@@ -421,15 +449,17 @@ public class PhotosController : ControllerBase
             .Take(10)
             .ToListAsync();
 
-        var topPhotosByKnownness = await _context.Photos
+        var topPredictedUnratedPhotos = await _context.Photos
             .Include(p => p.Album)
-            .OrderByDescending(p => p.Knownness)
+            .Where(p => p.IndependentScore == null && p.EstimatedScore != null)
+            .OrderByDescending(p => p.EstimatedScore)
             .Take(20)
             .ToListAsync();
 
-        var topPhotosByScore = await _context.Photos
+        var topManualPhotos = await _context.Photos
             .Include(p => p.Album)
-            .OrderByDescending(p => p.OverallScore)
+            .Where(p => p.IndependentScore != null)
+            .OrderByDescending(p => p.IndependentScore)
             .Take(20)
             .ToListAsync();
 
@@ -443,12 +473,12 @@ public class PhotosController : ControllerBase
         // 为每个相册添加代表性照片（独立分最高的照片）
         var albumsWithThumbnails = new List<dynamic>();
 
-        foreach (var album in topAlbumsByKnownRate)
+        foreach (var album in topAlbumsByRatedRate)
         {
             var topPhoto = await _context.Photos
                 .Where(p => p.AlbumId == album.AlbumId)
                 .OrderByDescending(p => p.IndependentScore)
-                .ThenByDescending(p => p.OverallScore)
+                .ThenByDescending(p => p.EstimatedScore)
                 .FirstOrDefaultAsync();
 
             if (topPhoto == null)
@@ -463,6 +493,9 @@ public class PhotosController : ControllerBase
                 album.AlbumId,
                 album.Name,
                 album.KnownRate,
+                album.RatedRate,
+                album.RatedPhotoCount,
+                album.AverageManualScore,
                 album.AlbumScore,
                 album.PhotoCount,
                 ThumbnailPath = topPhoto?.FilePath
@@ -476,7 +509,7 @@ public class PhotosController : ControllerBase
             var topPhoto = await _context.Photos
                 .Where(p => p.AlbumId == album.AlbumId)
                 .OrderByDescending(p => p.IndependentScore)
-                .ThenByDescending(p => p.OverallScore)
+                .ThenByDescending(p => p.EstimatedScore)
                 .FirstOrDefaultAsync();
 
             if (topPhoto == null)
@@ -491,6 +524,9 @@ public class PhotosController : ControllerBase
                 album.AlbumId,
                 album.Name,
                 album.KnownRate,
+                album.RatedRate,
+                album.RatedPhotoCount,
+                album.AverageManualScore,
                 album.AlbumScore,
                 album.PhotoCount,
                 ThumbnailPath = topPhoto?.FilePath
@@ -499,23 +535,27 @@ public class PhotosController : ControllerBase
 
         return Ok(new
         {
-            TopAlbumsByKnownRate = albumsWithThumbnails,
+            TopAlbumsByRatedRate = albumsWithThumbnails,
+            TopAlbumsByKnownRate = albumsWithThumbnails, // Legacy API alias
             TopAlbumsByScore = albumsByScoreWithThumbnails,
-            TopPhotosByKnownness = topPhotosByKnownness,
-            TopPhotosByScore = topPhotosByScore,
+            TopPredictedUnratedPhotos = topPredictedUnratedPhotos,
+            TopPhotosByKnownness = topPredictedUnratedPhotos, // Legacy API alias
+            TopManualPhotos = topManualPhotos,
+            TopPhotosByScore = topManualPhotos, // Legacy API alias
             RatingHistory = ratingHistory
         });
     }
 
     /// <summary>
-    /// 获取整体分最高的照片（分页）
+    /// 获取最终人工分最高的照片（分页）
     /// </summary>
     [HttpGet("top-by-score")]
     public async Task<ActionResult<List<Photo>>> GetTopByScore([FromQuery] int skip = 0, [FromQuery] int take = 5)
     {
         var photos = await _context.Photos
             .Include(p => p.Album)
-            .OrderByDescending(p => p.OverallScore)
+            .Where(p => p.IndependentScore != null)
+            .OrderByDescending(p => p.IndependentScore)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -524,14 +564,29 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 获取已知性最高的照片（分页）
+    /// 旧接口兼容：已知性已删除，现在返回 AI 预测最高的未评分照片。
     /// </summary>
     [HttpGet("top-by-knownness")]
     public async Task<ActionResult<List<Photo>>> GetTopByKnownness([FromQuery] int skip = 0, [FromQuery] int take = 5)
     {
         var photos = await _context.Photos
             .Include(p => p.Album)
-            .OrderByDescending(p => p.Knownness)
+            .Where(p => p.IndependentScore == null && p.EstimatedScore != null)
+            .OrderByDescending(p => p.EstimatedScore)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return Ok(photos);
+    }
+
+    [HttpGet("top-predicted")]
+    public async Task<ActionResult<List<Photo>>> GetTopPredicted([FromQuery] int skip = 0, [FromQuery] int take = 5)
+    {
+        var photos = await _context.Photos
+            .Include(p => p.Album)
+            .Where(p => p.IndependentScore == null && p.EstimatedScore != null)
+            .OrderByDescending(p => p.EstimatedScore)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -640,6 +695,17 @@ public class PhotosController : ControllerBase
         }
 
         return Ok(new { deletedCount = photosToDelete.Count });
+    }
+
+    private static uint StableShuffleKey(int photoId, int seed)
+    {
+        var value = unchecked((uint)photoId ^ (uint)seed);
+        value ^= value >> 16;
+        value *= 0x7feb352d;
+        value ^= value >> 15;
+        value *= 0x846ca68b;
+        value ^= value >> 16;
+        return value;
     }
 }
 

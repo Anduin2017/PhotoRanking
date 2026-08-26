@@ -11,6 +11,7 @@ public class SeederService(
     IConfiguration configuration, 
     ILogger<SeederService> logger,
     ImageAnalysisService imageAnalysis,
+    ScoringService scoringService,
     IServiceScopeFactory scopeFactory,
     CanonPool canonPool)
 {
@@ -283,56 +284,7 @@ public class SeederService(
 
     public async Task UpdateAlbumStatsAsync()
     {
-        var albums = await context.Albums.Include(a => a.Photos).ToListAsync();
-
-        foreach (var album in albums)
-        {
-            album.PhotoCount = album.Photos.Count();
-
-            var ratedPhotos = album.Photos.Where(p => p.IndependentScore.HasValue).ToList();
-            album.KnownRate = album.PhotoCount > 0 ? (double)ratedPhotos.Count / album.PhotoCount : 0;
-
-            // 计算相册分
-            if (ratedPhotos.Count > 0)
-            {
-                var avgRated = ratedPhotos.Average(p => p.IndependentScore!.Value);
-                var unratedScore = Math.Max(0, avgRated - 1);
-                
-                // 构建所有照片的分数列表（已评分用独立分，未评分用 unratedScore）
-                var allPhotoScores = new List<double>();
-                foreach (var photo in album.Photos)
-                {
-                    allPhotoScores.Add(photo.IndependentScore ?? unratedScore);
-                }
-            
-                // 排序并取前80%（至少取1张）
-                var sortedScores = allPhotoScores.OrderByDescending(s => s).ToList();
-                var top80PercentCount = Math.Max(1, (int)Math.Ceiling(sortedScores.Count * 0.8));
-                var topScores = sortedScores.Take(top80PercentCount);
-            
-                album.AlbumScore = topScores.Average();
-            }
-            else
-            {
-                album.AlbumScore = 2.5; // 默认分数
-            }
-
-            // 计算标准差、最高分、最低分
-            if (album.Photos.Count() > 0)
-            {
-                var scores = album.Photos.Select(p => p.IndependentScore ?? album.AlbumScore).ToList();
-                var mean = scores.Average();
-                var variance = scores.Sum(s => Math.Pow(s - mean, 2)) / scores.Count;
-                album.StandardDeviation = Math.Sqrt(variance);
-
-                album.HighestScore = scores.Max();
-                album.LowestScore = scores.Min();
-            }
-
-            album.UpdatedAt = DateTime.UtcNow;
-        }
-
-        await context.SaveChangesAsync();
-        logger.LogInformation("Updated statistics for {Count} albums", albums.Count);
+        await scoringService.RebuildAllAlbumStatsAsync();
+        logger.LogInformation("Rebuilt album reporting statistics from final manual scores");
     }
 }

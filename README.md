@@ -1,4 +1,4 @@
-# PhotoRanking - A sample project
+# PhotoRanking
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://gitlab.aiursoft.com/anduin/photoranking/-/blob/master/LICENSE)
 [![Pipeline stat](https://gitlab.aiursoft.com/anduin/photoranking/badges/master/pipeline.svg)](https://gitlab.aiursoft.com/anduin/photoranking/-/pipelines)
@@ -7,16 +7,22 @@
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Franking.anduinlab.com)](https://ranking.anduinlab.com)
 [![Docker](https://img.shields.io/docker/pulls/anduin2019/photoranking.svg)](https://hub.docker.com/r/anduin2019/photoranking)
 
-PhotoRanking is a simple web application that allows users to upload photos and have others rank them. It is built using ASP.NET Core and Entity Framework Core, with a SQLite database for data storage.
+PhotoRanking is a private, personal photo taste engine. You casually assign final scores while browsing; the app learns that taste from CLIP image embeddings and ranks the unseen library for you. It is built with ASP.NET Core, Angular, Entity Framework Core, ML.NET, and SQLite.
 
 ## Run manually
 
-Requirements about how to run
+1. Install the [.NET 10 SDK](https://dotnet.microsoft.com/), Node.js 24, and Python 3.11.
+2. Generate the CLIP visual model once:
 
-1. Install [.NET 10 SDK](http://dot.net/) and [Node.js](https://nodejs.org/).
-2. Execute `npm install` at `wwwroot` folder to install the dependencies.
-3. Execute `dotnet run` to run the app.
-4. Use your browser to view [http://localhost:5000](http://localhost:5000).
+   ```bash
+   python3 -m pip install torch transformers onnx onnxscript
+   cd scripts
+   python3 export_onnx.py
+   cd ..
+   ```
+
+3. Run `dotnet run --project src/Anduin.PhotoRanking/Anduin.PhotoRanking.csproj`. The build restores and compiles the Angular application automatically.
+4. Open [http://localhost:5000](http://localhost:5000).
 
 ## Run in Microsoft Visual Studio
 
@@ -49,94 +55,35 @@ The docker image has the following context:
 | Photos import | /photos                           |
 | Config path   | /data/appsettings.json          |
 
-## Core Scoring Algorithm
+## Personal scoring model
 
-PhotoRanking implements a sophisticated multi-layered scoring system that combines user ratings with AI-powered predictions to evaluate photo quality.
+The product has two photo scores:
 
-### Three Core Score Types
+1. **Final manual score** (`IndependentScore`, exposed as `manualScore`) is the user's source of truth. A new rating replaces the previous value; repeated ratings are corrections, never votes to average. The app presents 2–6 while the API continues to accept historic 0–6 data.
+2. **AI prediction** (`EstimatedScore`, exposed as `predictedScore`) is the model's estimate for an unrated photo. The For You feed contains only unrated photos and is ordered by this value descending.
 
-1. **Independent Score** (`IndependentScore`)
-   - Direct user rating for a single photo (0-6 scale)
-   - Represents the photo's intrinsic quality
-   - Becomes `null` if the photo has never been rated
-   - **Fixation mechanism**: If the last 3 consecutive ratings are identical, the photo is marked as `IsFixed = true` and the score is locked
+The predictor is a versioned regression ensemble trained from one row per rated photo: the current 512-dimensional CLIP embedding and the current final manual score. One full-data model produces the score while five deterministic bootstrap members measure disagreement. A separate coverage model measures distance from visually represented rating anchors. Disagreement and coverage distance are active-learning metadata, not extra photo scores. Rating history, rating count, album score, knownness, and old overall score are not model inputs. After a quiet period, a new model is trained and predictions are refreshed in resumable batches for unrated photos only.
 
-2. **Album Score** (`AlbumScore`)
-   - Represents the overall quality of the entire album
-   - Calculated using the **top 80% highest-scored photos** in the album
-   - **Formula**:
-     ```
-     For all photos in album:
-       - Rated photos use IndependentScore
-       - Unrated photos use unratedScore = max(0, avgRated - 1)
-     
-     Sort all photos by score (descending)
-     Take top 80% (at least 1 photo)
-     AlbumScore = average of top 80% photos
-     ```
-   - Defaults to `2.5` if no photos have been rated yet
-   - This approach emphasizes the album's best content rather than being dragged down by lower-quality photos
+The prediction shown after rating is the value frozen before the first rating. This provides an unbiased online evaluation sample. Corrections do not rewrite that sample or count as new prediction evaluations.
 
-3. **Overall Score** (`OverallScore`)
-   - The final score used for sorting and recommendations
-   - **Formula**:
-     ```
-     If photo has IndependentScore:
-       OverallScore = IndependentScore × 0.7 + AlbumScore × 0.3
-     Else:
-       OverallScore = AlbumScore
-     ```
-   - Balances individual photo quality (70%) with album context (30%)
+Album values are reporting statistics only:
 
-### Feedback Loop
+- `AverageManualScore` is the raw average of final manual scores in the album.
+- `AlbumScore` is a Bayesian-smoothed ranking value so an album with one lucky rating does not dominate the statistics page.
+- `RatedRate` is rating coverage.
 
-The scoring system forms a **bidirectional feedback loop**:
+None of these album values can change a photo's final score or prediction. Old schema columns and API aliases remain temporarily for database and rolling-container compatibility, but application behavior does not read them.
 
-```
-User rates photo → Updates IndependentScore
-                 ↓
-        Recalculates AlbumScore
-                 ↓
-    Updates OverallScore for ALL photos in the album
-```
+## Product modes
 
-When you rate a photo highly, it raises the album's average, which in turn increases the overall scores of all unrated photos in that album.
+- **Surprise** is the For You feed: unrated photos ordered by personal prediction descending.
+- **Enjoy** is a stable random slideshow inside a user-selected final-score range.
+- **Work** prioritizes visually uncovered regions, then ensemble disagreement, album diversity, and low prior exposure. It chooses unrated photos whose new manual anchor should teach the model most.
+- **Random** browses unrated photos without active-learning priority.
 
-### AI-Powered Score Prediction
+Advanced statistics, directory browsing, exact-score browsing, duplicate review, visual similarity, and image search remain independent tools.
 
-For unrated photos, the system can predict scores using a **Stratified KNN (K-Nearest Neighbors) algorithm** based on image similarity:
-
-1. **Stratified Sampling**: Uses SQL window functions to select the top 20 most similar photos from each score tier (0-6), preventing bias from overrepresented high-score photos
-
-2. **Top-K Similarity Matching**: For each score tier, calculates cosine similarity between feature vectors and takes the **average of the top 3** most similar photos (not all photos), ensuring that even rare cases are properly weighted
-
-3. **Non-linear Confidence Amplification**: Applies `similarity^30` to dramatically amplify small differences in similarity (e.g., 0.80 vs 0.85 becomes a 1:10 ratio instead of 1:1)
-
-4. **SmoothStep Smoothing**: Applies Hermite interpolation to the predicted score for more natural distribution:
-   ```
-   t = rawScore / 6.0
-   smoothed = t² × (3 - 2t)
-   finalScore = smoothed × 6.0
-   ```
-   This makes predicted scores more natural, avoiding clustering at integer values
-
-### Knownness Score
-
-Beyond quality scores, each photo has a **Knownness** metric (0-100) that affects its recommendation priority:
-
-```
-If photo is fixed (last 3 ratings identical):
-  Knownness = 50 + albumKnownRate × 50
-
-Else:
-  ratingScore = min(ratingCount, 5) × 10      // Max 50 points
-  albumScore = albumKnownRate × 50             // Max 50 points
-  Knownness = ratingScore + albumScore
-```
-
-Where `albumKnownRate = ratedPhotosCount / totalPhotosCount`
-
-This encourages the system to show both under-rated photos (low knownness) and uncertain photos (not yet fixed) to the user.
+The model contract, upgrade invariants, and current retrospective evaluation are documented in [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
 
 ## How to contribute
 

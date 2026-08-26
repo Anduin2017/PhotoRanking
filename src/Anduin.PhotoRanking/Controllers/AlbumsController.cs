@@ -32,10 +32,13 @@ public class AlbumsController : ControllerBase
                 a.Name,
                 a.AlbumScore,
                 a.KnownRate,
+                RatedRate = a.KnownRate,
+                a.RatedPhotoCount,
+                a.AverageManualScore,
                 a.PhotoCount,
                 ThumbnailPath = a.Photos
                     .OrderByDescending(p => p.IndependentScore ?? -1)
-                    .ThenByDescending(p => p.OverallScore)
+                    .ThenByDescending(p => p.EstimatedScore ?? -1)
                     .Select(p => p.FilePath)
                     .FirstOrDefault()
             })
@@ -73,10 +76,10 @@ public class AlbumsController : ControllerBase
         {
             photos = sortBy.ToLower() switch
             {
-                "score" or "overallscore" => photos.OrderByDescending(p => p.OverallScore),
+                "score" or "overallscore" => photos.OrderByDescending(p => p.IndependentScore ?? p.EstimatedScore ?? -1),
                 "rated" => photos.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
                 "unrated" => photos.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
-                "independentscore" => photos.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
+                "manualscore" or "independentscore" => photos.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.EstimatedScore),
                 _ => photos.OrderBy(p => p.FilePath)
             };
         }
@@ -110,9 +113,9 @@ public class AlbumsController : ControllerBase
         query = sortBy.ToLower() switch
         {
             "estimatedscore" => query.OrderByDescending(p => p.EstimatedScore).ThenBy(p => p.FilePath),
-            "independentscore" => query.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.OverallScore),
-            "overallscore" => query.OrderByDescending(p => p.OverallScore),
-            "knownness" => query.OrderByDescending(p => p.Knownness),
+            "manualscore" or "independentscore" => query.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.EstimatedScore),
+            "score" or "overallscore" => query.OrderByDescending(p => p.IndependentScore ?? p.EstimatedScore),
+            "knownness" => query.OrderByDescending(p => p.EstimatedScore), // Legacy alias
             "rated" => query.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
             "unrated" => query.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
             _ => query.OrderBy(p => p.FilePath) // 默认按文件名
@@ -129,7 +132,7 @@ public class AlbumsController : ControllerBase
             photos = await _context.Photos
                 .Where(p => p.AlbumId == albumId)
                 .OrderByDescending(p => p.IndependentScore)
-                .ThenByDescending(p => p.OverallScore)
+                .ThenByDescending(p => p.EstimatedScore)
                 .ToListAsync();
         }
 
@@ -154,7 +157,7 @@ public class AlbumsController : ControllerBase
             var topPhoto = await _context.Photos
                 .Where(p => p.AlbumId == album.AlbumId)
                 .OrderByDescending(p => p.IndependentScore)
-                .ThenByDescending(p => p.OverallScore)
+                .ThenByDescending(p => p.EstimatedScore)
                 .FirstOrDefaultAsync();
 
             if (topPhoto == null)
@@ -169,6 +172,9 @@ public class AlbumsController : ControllerBase
                 album.AlbumId,
                 album.Name,
                 album.KnownRate,
+                album.RatedRate,
+                album.RatedPhotoCount,
+                album.AverageManualScore,
                 album.AlbumScore,
                 album.PhotoCount,
                 ThumbnailPath = topPhoto?.FilePath
@@ -179,10 +185,11 @@ public class AlbumsController : ControllerBase
     }
 
     /// <summary>
-    /// 获取已知率最高的相册（分页）
+    /// 获取人工评分覆盖率最高的相册（分页）
     /// </summary>
-    [HttpGet("top-by-knownrate")]
-    public async Task<ActionResult<List<object>>> GetTopByKnownRate([FromQuery] int skip = 0, [FromQuery] int take = 5)
+    [HttpGet("top-by-ratedrate")]
+    [HttpGet("top-by-knownrate")] // Legacy API alias
+    public async Task<ActionResult<List<object>>> GetTopByRatedRate([FromQuery] int skip = 0, [FromQuery] int take = 5)
     {
         var albums = await _context.Albums
             .OrderByDescending(a => a.KnownRate)
@@ -196,7 +203,7 @@ public class AlbumsController : ControllerBase
             var topPhoto = await _context.Photos
                 .Where(p => p.AlbumId == album.AlbumId)
                 .OrderByDescending(p => p.IndependentScore)
-                .ThenByDescending(p => p.OverallScore)
+                .ThenByDescending(p => p.EstimatedScore)
                 .FirstOrDefaultAsync();
 
             if (topPhoto == null)
@@ -211,6 +218,9 @@ public class AlbumsController : ControllerBase
                 album.AlbumId,
                 album.Name,
                 album.KnownRate,
+                album.RatedRate,
+                album.RatedPhotoCount,
+                album.AverageManualScore,
                 album.AlbumScore,
                 album.PhotoCount,
                 ThumbnailPath = topPhoto?.FilePath

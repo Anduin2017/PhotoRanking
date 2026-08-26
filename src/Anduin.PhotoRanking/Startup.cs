@@ -35,9 +35,9 @@ public class Startup : IWebStartup
         services.AddTaskCanon();
 
         services.AddScoped<ScoringService>();
+        services.AddScoped<PersonalizedPredictionService>();
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
-        services.AddScoped<UserPreferenceService>();
         services.AddScoped<DedupService>();
 
         services.AddHostedService<PredictorBackgroundService>();

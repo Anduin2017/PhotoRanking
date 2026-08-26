@@ -81,7 +81,9 @@ public class SeederServiceTests
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
+        var scoringService = new ScoringService(
+            _context, analysisService, configuration, new Mock<ILogger<ScoringService>>().Object);
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scoringService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -128,7 +130,9 @@ public class SeederServiceTests
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
+        var scoringService = new ScoringService(
+            _context, analysisService, configuration, new Mock<ILogger<ScoringService>>().Object);
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scoringService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();
@@ -173,7 +177,9 @@ public class SeederServiceTests
         scopeMock.Setup(x => x.ServiceProvider).Returns(serviceProviderMock.Object);
         scopeFactoryMock.Setup(x => x.CreateScope()).Returns(scopeMock.Object);
 
-        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scopeFactoryMock.Object, canonPool);
+        var scoringService = new ScoringService(
+            _context, analysisService, configuration, new Mock<ILogger<ScoringService>>().Object);
+        var seeder = new SeederService(_context, configuration, loggerMock.Object, analysisService, scoringService, scopeFactoryMock.Object, canonPool);
 
         // 2. Initial seed
         await seeder.SeedAsync();

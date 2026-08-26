@@ -4,8 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Anduin.PhotoRanking.Services;
 
 /// <summary>
-/// 后台推测分计算工作者
-/// 策略：当用户停止评分 20 分钟后，且系统存在未同步的评分变更时，触发全量计算。
+/// 个人化预测后台工作者。
+/// 用户停止评分 20 分钟后，用每张照片的最终人工分重新训练模型，
+/// 再只为尚未评分的照片刷新预测。
 /// </summary>
 public class PredictorBackgroundService(
     IServiceScopeFactory scopeFactory,
@@ -40,35 +41,74 @@ public class PredictorBackgroundService(
     {
         using var scope = scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var scoringService = scope.ServiceProvider.GetRequiredService<ScoringService>();
+        var predictionService = scope.ServiceProvider.GetRequiredService<PersonalizedPredictionService>();
 
         // 1. 获取全局状态
         var state = await context.SystemStates.FirstOrDefaultAsync(ct);
-        if (state == null) return;
+        if (state == null)
+        {
+            state = new Anduin.PhotoRanking.Models.SystemState
+            {
+                LastRatingAt = await context.Photos.MaxAsync(p => p.LastRatedAt, ct) ?? DateTime.MinValue
+            };
+            context.SystemStates.Add(state);
+            await context.SaveChangesAsync(ct);
+        }
+
+        // This is the newest rating the model can possibly include. Never advance the
+        // training watermark past it: a rating may arrive while a large refresh runs.
+        var ratingWatermark = state.LastRatingAt;
 
         // 2. 检查静默时间
-        var timeSinceLastRating = DateTime.UtcNow - state.LastRatingAt;
+        var timeSinceLastRating = DateTime.UtcNow - ratingWatermark;
         if (timeSinceLastRating < _quietPeriod)
         {
             return;
         }
 
-        // 3. 检查是否有待更新的照片（水印对比）
-        // 如果自上次打分后，还没进行过全量更新，或者存在从未更新过的照片
-        bool needsUpdate = state.LastRatingAt > state.LastGlobalScoringAt ||
-                          await context.Photos.AnyAsync(p => p.EstimatedScoreUpdatedAt == null, ct);
+        var activeModel = await predictionService.GetActiveModelMetadataAsync(ct);
+        var trainingCandidateCount = await context.Photos.CountAsync(p =>
+            p.IndependentScore != null && p.FeatureVector != null, ct);
+        var modelIsStale = activeModel == null ||
+                           activeModel.EmbeddingModel != PersonalizedPredictionService.EmbeddingModelName ||
+                           !activeModel.Version.StartsWith(
+                               PersonalizedPredictionService.AlgorithmVersion + "-",
+                               StringComparison.Ordinal) ||
+                           activeModel.TrainingRatingWatermark < ratingWatermark ||
+                           activeModel.TrainingCandidatePhotoCount != trainingCandidateCount;
+        if (modelIsStale)
+        {
+            activeModel = await predictionService.TrainAndActivateAsync(ratingWatermark, ct);
+        }
+
+        if (activeModel == null)
+        {
+            return;
+        }
+
+        // 只刷新未评分照片。已评分照片的旧预测必须保留，避免评分后用自己预测自己。
+        var needsUpdate = await context.Photos.AnyAsync(p =>
+            p.IndependentScore == null &&
+            p.FeatureVector != null &&
+            (p.EstimatedScoreUpdatedAt == null ||
+             p.EstimatedScoreModelVersion != activeModel.Version), ct);
 
         if (!needsUpdate) return;
 
-        logger.LogInformation("Quiet period detected. Starting batch background scoring...");
+        logger.LogInformation(
+            "Refreshing unrated predictions with personal model {Version}...",
+            activeModel.Version);
 
         // 4. 分批更新推测分
-        int batchSize = 100;
+        const int batchSize = 1000;
         while (true)
         {
-            // 找出所有推测分已过期的照片（或是从未计算过的）
+            // 模型版本是预测缓存的唯一失效依据。
             var photosToUpdate = await context.Photos
-                .Where(p => p.EstimatedScoreUpdatedAt == null || p.EstimatedScoreUpdatedAt < state.LastRatingAt)
+                .Where(p => p.IndependentScore == null &&
+                            p.FeatureVector != null &&
+                            (p.EstimatedScoreUpdatedAt == null ||
+                             p.EstimatedScoreModelVersion != activeModel.Version))
                 .Take(batchSize)
                 .ToListAsync(ct);
 
@@ -76,14 +116,16 @@ public class PredictorBackgroundService(
 
             logger.LogInformation("Processing batch of {Count} photos...", photosToUpdate.Count);
             
-            // 执行批量计算并持久化
-            await scoringService.BatchGuessScoresInternal(photosToUpdate);
-            
-            // 注意：BatchGuessScoresInternal 内部已调用 SaveChangesAsync
+            await predictionService.PredictAndPersistBatchAsync(photosToUpdate, ct);
+            context.ChangeTracker.Clear();
         }
 
         // 5. 更新全局水印
-        state.LastGlobalScoringAt = DateTime.UtcNow;
+        state = await context.SystemStates.FirstAsync(ct);
+        if (state.LastRatingAt <= ratingWatermark && state.LastGlobalScoringAt < ratingWatermark)
+        {
+            state.LastGlobalScoringAt = ratingWatermark;
+        }
         await context.SaveChangesAsync(ct);
         
         logger.LogInformation("Background scoring completed.");

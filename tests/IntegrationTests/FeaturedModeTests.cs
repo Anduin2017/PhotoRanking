@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
@@ -16,7 +15,7 @@ public class FeaturedModeTests
 
     public FeaturedModeTests()
     {
-        _port = Network.GetAvailablePort();
+        _port = TestPortAllocator.GetAvailablePort();
         _http = new HttpClient
         {
             BaseAddress = new Uri($"http://localhost:{_port}")

@@ -1,8 +1,8 @@
 using System.Net;
-using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
+using Microsoft.EntityFrameworkCore;
 using static Aiursoft.WebTools.Extends;
 
 namespace Anduin.PhotoRanking.Tests.IntegrationTests;
@@ -16,11 +16,8 @@ public class SixPointTests
 
     public SixPointTests()
     {
-        _port = Network.GetAvailablePort();
-        _http = new HttpClient
-        {
-            BaseAddress = new Uri($"http://localhost:{_port}")
-        };
+        _port = TestPortAllocator.GetAvailablePort();
+        _http = new HttpClient { BaseAddress = new Uri($"http://localhost:{_port}") };
     }
 
     [TestInitialize]
@@ -40,231 +37,108 @@ public class SixPointTests
     }
 
     [TestMethod]
-    public async Task TestSixPointUnlockLogic()
+    public async Task SixIsAlwaysAValidFirstRatingAndCapturesBlindPrediction()
     {
-        int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 4.5
-        using (var scope = _server!.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var album = new Album 
-            { 
-                AlbumId = "high-score-album", 
-                Name = "High Score Album",
-                AlbumScore = 4.5 
-            };
-            context.Albums.Add(album);
-            
-            var photo = new Photo 
-            { 
-                FilePath = "awesome.jpg", 
-                AlbumId = "high-score-album", 
-                IndependentScore = 5.0, 
-                OverallScore = 5.0,
-                RatingCount = 9
-            };
-            context.Photos.Add(photo);
-            await context.SaveChangesAsync();
-            photoId = photo.Id;
-        }
+        var photoId = await SeedPhotoAsync("first-rating", null, 4.25, "test-model-v1", 0, false);
 
-        // 2. Try to rate 6
         var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-        
-        var updatedPhoto = await response.Content.ReadFromJsonAsync<Photo>();
-        Assert.IsNotNull(updatedPhoto);
-        Assert.AreEqual(6.0, updatedPhoto.IndependentScore ?? 0, 0.0001);
+
+        using var scope = _server!.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var photo = await context.Photos.SingleAsync(p => p.Id == photoId);
+        var log = await context.RatingLogs.SingleAsync(l => l.PhotoId == photoId);
+
+        Assert.AreEqual(6.0, photo.IndependentScore);
+        Assert.AreEqual(6.0, photo.OverallScore);
+        Assert.AreEqual(0, photo.RatingCount, "Legacy rating count must no longer be maintained.");
+        Assert.IsFalse(log.IsCorrection);
+        Assert.IsNull(log.PreviousScore);
+        Assert.AreEqual(4.25, log.PredictionAtRating);
+        Assert.AreEqual("test-model-v1", log.PredictionModelVersion);
     }
 
     [TestMethod]
-    public async Task TestSixPointLockLogic_LowRatingCount()
+    public async Task ReRatingOverwritesTheFinalScoreWithoutAveragingOrLocking()
     {
-        int photoId;
-        // 1. Seed data: Photo with 5 ratings, score 5, album score 4.5
+        var photoId = await SeedPhotoAsync("correction", 2, 4.8, "old-model", 999, true);
+
+        (await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 5 })).EnsureSuccessStatusCode();
+        (await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 3 })).EnsureSuccessStatusCode();
+
+        using var scope = _server!.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var photo = await context.Photos.SingleAsync(p => p.Id == photoId);
+        var logs = await context.RatingLogs.Where(l => l.PhotoId == photoId).OrderBy(l => l.Id).ToListAsync();
+
+        Assert.AreEqual(3.0, photo.IndependentScore, "The latest correction is the only source of truth.");
+        Assert.AreEqual(999, photo.RatingCount, "Legacy count must not influence or track corrections.");
+        Assert.IsFalse(photo.IsFixed);
+        Assert.HasCount(2, logs);
+        Assert.IsTrue(logs.All(l => l.IsCorrection));
+        Assert.AreEqual(2.0, logs[0].PreviousScore);
+        Assert.AreEqual(5.0, logs[1].PreviousScore);
+        Assert.IsTrue(logs.All(l => l.PredictionAtRating == null), "Corrections are not prediction evaluation samples.");
+    }
+
+    [TestMethod]
+    public async Task RatingOnePhotoNeverChangesAnotherPhotosFinalScore()
+    {
+        int targetId;
+        int neighborId;
         using (var scope = _server!.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var album = new Album 
-            { 
-                AlbumId = "album1", 
-                Name = "Album 1",
-                AlbumScore = 4.5 
-            };
-            context.Albums.Add(album);
-            
-            var photo = new Photo 
-            { 
-                FilePath = "photo1.jpg", 
-                AlbumId = "album1", 
-                IndependentScore = 5.0, 
-                OverallScore = 5.0,
-                RatingCount = 5
-            };
-            context.Photos.Add(photo);
+            context.Albums.Add(new Album { AlbumId = "album-isolation", Name = "Album Isolation", AlbumScore = 1 });
+            var target = new Photo { FilePath = "target.jpg", AlbumId = "album-isolation", IndependentScore = 2, OverallScore = 2 };
+            var neighbor = new Photo { FilePath = "neighbor.jpg", AlbumId = "album-isolation", IndependentScore = 5, OverallScore = 5 };
+            context.Photos.AddRange(target, neighbor);
             await context.SaveChangesAsync();
-            photoId = photo.Id;
+            targetId = target.Id;
+            neighborId = neighbor.Id;
         }
 
-        // 2. Try to rate 6
-        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
+        (await _http.PostAsJsonAsync($"/api/photos/{targetId}/rate", new { Score = 6 })).EnsureSuccessStatusCode();
+
+        using var verificationScope = _server!.Services.CreateScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var neighborAfter = await verificationContext.Photos.SingleAsync(p => p.Id == neighborId);
+        Assert.AreEqual(5.0, neighborAfter.IndependentScore);
+        Assert.AreEqual(5.0, neighborAfter.OverallScore);
+    }
+
+    [TestMethod]
+    public async Task ScoresOutsideTheCompatibleZeroToSixRangeAreRejected()
+    {
+        var photoId = await SeedPhotoAsync("invalid", null, null, null, 0, false);
+        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 7 });
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [TestMethod]
-    public async Task TestSixPointLockLogic_LowAlbumScore()
+    private async Task<int> SeedPhotoAsync(
+        string albumId,
+        double? manualScore,
+        double? predictedScore,
+        string? predictionVersion,
+        int legacyRatingCount,
+        bool legacyFixed)
     {
-        int photoId;
-        // 1. Seed data: Photo with 10 ratings, score 5, album score 2.9 (Should Fail < 3.0)
-        using (var scope = _server!.Services.CreateScope())
+        using var scope = _server!.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        context.Albums.Add(new Album { AlbumId = albumId, Name = albumId, AlbumScore = 0.5 });
+        var photo = new Photo
         {
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var album = new Album 
-            { 
-                AlbumId = "album2", 
-                Name = "Album 2",
-                AlbumScore = 2.9 
-            };
-            context.Albums.Add(album);
-            
-            var photo = new Photo 
-            { 
-                FilePath = "photo2.jpg", 
-                AlbumId = "album2", 
-                IndependentScore = 5.0, 
-                OverallScore = 5.0,
-                RatingCount = 10
-            };
-            context.Photos.Add(photo);
-            await context.SaveChangesAsync();
-            photoId = photo.Id;
-        }
-
-        // 2. Try to rate 6
-        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
-        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [TestMethod]
-    public async Task TestSixPointUnlockLogic_BoundaryScore_Above()
-    {
-        int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 3.0 (Should Pass >= 3.0)
-        using (var scope = _server!.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var album = new Album 
-            { 
-                AlbumId = "boundary-above", 
-                Name = "Boundary Above",
-                AlbumScore = 3.0 
-            };
-            context.Albums.Add(album);
-            
-            var photo = new Photo 
-            { 
-                FilePath = "boundary_above.jpg", 
-                AlbumId = "boundary-above", 
-                IndependentScore = 5.0, 
-                OverallScore = 5.0,
-                RatingCount = 9
-            };
-            context.Photos.Add(photo);
-            await context.SaveChangesAsync();
-            photoId = photo.Id;
-        }
-
-        // 2. Try to rate 6
-        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
-        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [TestMethod]
-    public async Task TestSixPointUnlockLogic_BoundaryScore_Exact()
-    {
-        int photoId;
-        // 1. Seed data: Photo with 9 ratings, score 5, album score 2.9 (Should Fail < 3.0)
-        using (var scope = _server!.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var album = new Album 
-            { 
-                AlbumId = "boundary-exact", 
-                Name = "Boundary Exact",
-                AlbumScore = 2.9 
-            };
-            context.Albums.Add(album);
-            
-            var photo = new Photo 
-            { 
-                FilePath = "boundary_exact.jpg", 
-                AlbumId = "boundary-exact", 
-                IndependentScore = 5.0, 
-                OverallScore = 5.0,
-                RatingCount = 9
-            };
-            context.Photos.Add(photo);
-            await context.SaveChangesAsync();
-            photoId = photo.Id;
-        }
-
-        // 2. Try to rate 6
-        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
-        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [TestMethod]
-    public async Task TestSixPointLockLogic_ThreePhotosLimit()
-    {
-        int photoId;
-        // 1. Seed data: Album with 3 photos already rated 6
-        using (var scope = _server!.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            
-            var album = new Album 
-            { 
-                AlbumId = "full-album", 
-                Name = "Full Album",
-                AlbumScore = 5.0 
-            };
-            context.Albums.Add(album);
-
-            for (int i = 0; i < 3; i++)
-            {
-                context.Photos.Add(new Photo 
-                { 
-                    FilePath = $"six_{i}.jpg", 
-                    AlbumId = "full-album", 
-                    IndependentScore = 6.0, 
-                    RatingCount = 10 
-                });
-            }
-            
-            var targetPhoto = new Photo 
-            { 
-                FilePath = "target.jpg", 
-                AlbumId = "full-album", 
-                IndependentScore = 5.0, 
-                RatingCount = 10 
-            };
-            context.Photos.Add(targetPhoto);
-            await context.SaveChangesAsync();
-            photoId = targetPhoto.Id;
-        }
-
-        // 2. Try to rate 6
-        var response = await _http.PostAsJsonAsync($"/api/photos/{photoId}/rate", new { Score = 6 });
-        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
-        
-        var error = await response.Content.ReadFromJsonAsync<dynamic>();
-        Assert.IsNotNull(error);
-        // The dynamic error object from BadRequest(new { error = ex.Message })
-        // will be { "error": "..." }
+            FilePath = $"{albumId}.jpg",
+            AlbumId = albumId,
+            IndependentScore = manualScore,
+            OverallScore = manualScore ?? predictedScore ?? 0,
+            EstimatedScore = predictedScore,
+            EstimatedScoreModelVersion = predictionVersion,
+            RatingCount = legacyRatingCount,
+            IsFixed = legacyFixed
+        };
+        context.Photos.Add(photo);
+        await context.SaveChangesAsync();
+        return photo.Id;
     }
 }

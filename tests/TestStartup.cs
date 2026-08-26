@@ -6,6 +6,7 @@ using Aiursoft.Canon;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using Aiursoft.CSTools.Tools;
 
 namespace Anduin.PhotoRanking.Tests;
 
@@ -33,9 +34,9 @@ public class TestStartup : IWebStartup
         services.AddTaskCanon();
 
         services.AddScoped<ScoringService>();
+        services.AddScoped<PersonalizedPredictionService>();
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
-        services.AddScoped<UserPreferenceService>();
 
         // Controllers and localization
         services.AddControllersWithViews()
@@ -57,5 +58,25 @@ public class TestStartup : IWebStartup
         app.UseAuthorization();
         app.MapDefaultControllerRoute();
         app.MapFallbackToFile("index.html");
+    }
+}
+
+public static class TestPortAllocator
+{
+    private static readonly object AllocationLock = new();
+    private static readonly HashSet<int> AllocatedPorts = [];
+
+    public static int GetAvailablePort()
+    {
+        lock (AllocationLock)
+        {
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                var port = Network.GetAvailablePort();
+                if (AllocatedPorts.Add(port)) return port;
+            }
+        }
+
+        throw new InvalidOperationException("Could not allocate a unique integration-test port.");
     }
 }

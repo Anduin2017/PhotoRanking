@@ -1,5 +1,4 @@
 using System.Net;
-using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using static Aiursoft.WebTools.Extends;
@@ -23,7 +22,7 @@ public class BasicTests
             CookieContainer = cookieContainer,
             AllowAutoRedirect = false
         };
-        _port = Network.GetAvailablePort();
+        _port = TestPortAllocator.GetAvailablePort();
         _http = new HttpClient(handler)
         {
             BaseAddress = new Uri($"http://localhost:{_port}")
@@ -85,6 +84,16 @@ public class BasicTests
     }
 
     [TestMethod]
+    public async Task GlobalStatsAreAvailableBeforeTheFirstPredictionModel()
+    {
+        var response = await _http.GetAsync("/api/admin/global-stats");
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        StringAssert.Contains(content, "activeLearningReadyCount");
+        StringAssert.Contains(content, "predictionReadyCount");
+    }
+
+    [TestMethod]
     public async Task GetAlbumWithSorting()
     {
         // First get all albums to get a valid albumId
@@ -96,7 +105,7 @@ public class BasicTests
         if (albums != null && albums.Count > 0)
         {
             string albumId = albums[0].albumId;
-            var sorts = new[] { "filename", "score", "rated", "unrated", "independentscore" };
+            var sorts = new[] { "filename", "score", "rated", "unrated", "manualscore", "estimatedscore" };
             
             foreach (var sort in sorts)
             {

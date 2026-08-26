@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
@@ -16,7 +15,7 @@ public class WaitingModeTests
 
     public WaitingModeTests()
     {
-        _port = Network.GetAvailablePort();
+        _port = TestPortAllocator.GetAvailablePort();
         _http = new HttpClient
         {
             BaseAddress = new Uri($"http://localhost:{_port}")
@@ -50,14 +49,12 @@ public class WaitingModeTests
             var album = new Album { AlbumId = "test-album-w", Name = "Test Album W" };
             context.Albums.Add(album);
             
-            // Photo with very low score
+            // An unrated photo may have any prediction; waiting mode ignores score filters.
             context.Photos.Add(new Photo 
             { 
                 FilePath = "photo-new.jpg", 
                 AlbumId = "test-album-w", 
-                OverallScore = 0, 
-                Knownness = 0,
-                RatingCount = 0 
+                EstimatedScore = 0
             });
             
             await context.SaveChangesAsync();
@@ -94,8 +91,7 @@ public class WaitingModeTests
                 { 
                     FilePath = $"photo-{i}.jpg", 
                     AlbumId = "test-album-r", 
-                    OverallScore = 0, 
-                    Knownness = 0 
+                    EstimatedScore = i / 10.0
                 });
             }
             
@@ -133,9 +129,7 @@ public class WaitingModeTests
                 FilePath = "photo-rated.jpg",
                 AlbumId = "test-album-exclude",
                 IndependentScore = 3.0,
-                OverallScore = 3.0,
-                Knownness = 50,
-                RatingCount = 1
+                OverallScore = 3.0
             });
 
             // Unrated photo
@@ -144,9 +138,7 @@ public class WaitingModeTests
                 FilePath = "photo-unrated.jpg",
                 AlbumId = "test-album-exclude",
                 IndependentScore = null,
-                OverallScore = 0,
-                Knownness = 0,
-                RatingCount = 0
+                EstimatedScore = 4.0
             });
 
             await context.SaveChangesAsync();

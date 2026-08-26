@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
@@ -16,7 +15,7 @@ public class EnjoyModeTests
 
     public EnjoyModeTests()
     {
-        _port = Network.GetAvailablePort();
+        _port = TestPortAllocator.GetAvailablePort();
         _http = new HttpClient
         {
             BaseAddress = new Uri($"http://localhost:{_port}")
@@ -55,6 +54,7 @@ public class EnjoyModeTests
             { 
                 FilePath = "photo1.jpg", 
                 AlbumId = "test-album", 
+                IndependentScore = 3.5,
                 OverallScore = 3.5, 
                 RatingCount = 1 
             });
@@ -64,6 +64,7 @@ public class EnjoyModeTests
             { 
                 FilePath = "photo2.jpg", 
                 AlbumId = "test-album", 
+                IndependentScore = 1.5,
                 OverallScore = 1.5, 
                 RatingCount = 1 
             });
@@ -84,7 +85,7 @@ public class EnjoyModeTests
             });
 
             Assert.IsFalse(photos!.Any(x => x.FilePath == "photo2.jpg"), "Low score photo should NOT be included in enjoy mode");
-            Assert.IsTrue(photos!.All(x => x.OverallScore >= 3.0), "All photos in enjoy mode should have overall score >= 3.0");
+            Assert.IsTrue(photos!.All(x => x.IndependentScore >= 3.0), "All photos in enjoy mode should have final manual score >= 3.0");
         }
     }
 
@@ -104,6 +105,7 @@ public class EnjoyModeTests
             {
                 FilePath = "photo-high.jpg",
                 AlbumId = "test-album-2",
+                IndependentScore = 4.5,
                 OverallScore = 4.5,
                 RatingCount = 1
             });
@@ -113,6 +115,7 @@ public class EnjoyModeTests
             {
                 FilePath = "photo-mid.jpg",
                 AlbumId = "test-album-2",
+                IndependentScore = 3.5,
                 OverallScore = 3.5,
                 RatingCount = 1
             });
@@ -122,6 +125,7 @@ public class EnjoyModeTests
             {
                 FilePath = "photo-low.jpg",
                 AlbumId = "test-album-2",
+                IndependentScore = 2.5,
                 OverallScore = 2.5,
                 RatingCount = 1
             });
@@ -139,9 +143,39 @@ public class EnjoyModeTests
             PropertyNameCaseInsensitive = true
         });
 
-        Assert.IsTrue(photos!.All(x => x.OverallScore >= 4.0), "All photos should have overall score >= 4.0");
+        Assert.IsTrue(photos!.All(x => x.IndependentScore >= 4.0), "All photos should have final manual score >= 4.0");
         Assert.IsTrue(photos!.Any(x => x.FilePath == "photo-high.jpg"));
         Assert.IsFalse(photos!.Any(x => x.FilePath == "photo-mid.jpg"));
         Assert.IsFalse(photos!.Any(x => x.FilePath == "photo-low.jpg"));
+    }
+
+    [TestMethod]
+    public async Task EnjoyModeUsesAStableRandomOrderInsideTheRequestedRange()
+    {
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            context.Albums.Add(new Album { AlbumId = "enjoy-range", Name = "Enjoy Range" });
+            context.Photos.AddRange(
+                new Photo { FilePath = "below.jpg", AlbumId = "enjoy-range", IndependentScore = 3.9 },
+                new Photo { FilePath = "inside-a.jpg", AlbumId = "enjoy-range", IndependentScore = 4.0 },
+                new Photo { FilePath = "inside-b.jpg", AlbumId = "enjoy-range", IndependentScore = 4.5 },
+                new Photo { FilePath = "above.jpg", AlbumId = "enjoy-range", IndependentScore = 5.0 });
+            await context.SaveChangesAsync();
+        }
+
+        const string query = "/api/photos/discover?mode=enjoy&minScore=4&maxScore=4.5&pageSize=1&shuffleSeed=123";
+        var firstPage = await _http.GetFromJsonAsync<List<Photo>>(query + "&page=1");
+        var firstPageAgain = await _http.GetFromJsonAsync<List<Photo>>(query + "&page=1");
+        var secondPage = await _http.GetFromJsonAsync<List<Photo>>(query + "&page=2");
+
+        Assert.IsNotNull(firstPage);
+        Assert.IsNotNull(firstPageAgain);
+        Assert.IsNotNull(secondPage);
+        Assert.HasCount(1, firstPage);
+        Assert.HasCount(1, secondPage);
+        Assert.AreEqual(firstPage[0].Id, firstPageAgain[0].Id, "One slideshow session must have stable ordering.");
+        Assert.AreNotEqual(firstPage[0].Id, secondPage[0].Id, "Adjacent pages must not repeat a photo.");
+        Assert.IsTrue(firstPage.Concat(secondPage).All(p => p.IndependentScore is >= 4 and <= 4.5));
     }
 }

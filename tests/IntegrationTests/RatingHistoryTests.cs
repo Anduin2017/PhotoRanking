@@ -1,6 +1,5 @@
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
-using Aiursoft.CSTools.Tools;
 using Aiursoft.DbTools;
 using static Aiursoft.WebTools.Extends;
 using Newtonsoft.Json;
@@ -16,7 +15,7 @@ public class RatingHistoryTests
 
     public RatingHistoryTests()
     {
-        _port = Network.GetAvailablePort();
+        _port = TestPortAllocator.GetAvailablePort();
         _http = new HttpClient
         {
             BaseAddress = new Uri($"http://localhost:{_port}")

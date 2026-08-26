@@ -24,24 +24,7 @@ public class ScoringService
     }
 
     /// <summary>
-    /// 应用 SmoothStep 算法（Hermite 插值）来平滑分数
-    /// 公式：t = x/6, y = 6 * (t^2 * (3 - 2t))
-    /// 例如：4.0 -> 4.48 (接近 4.5)
-    /// </summary>
-    private double ApplySmoothStep(double score)
-    {
-        // 将分数归一化到 [0, 1] 区间
-        double t = score / 6.0;
-        
-        // Hermite 插值公式：t^2 * (3 - 2t)
-        double smoothed = t * t * (3.0 - 2.0 * t);
-        
-        // 还原到 [0, 6] 区间
-        return smoothed * 6.0;
-    }
-
-    /// <summary>
-    /// 为照片打分并更新所有相关分数
+    /// 覆盖照片的最终人工分。评分历史、评分次数和相册都不得改变最终分。
     /// </summary>
     public async Task<Photo> RatePhotoAsync(int photoId, int score)
     {
@@ -51,7 +34,6 @@ public class ScoringService
         }
 
         var photo = await _context.Photos
-            .Include(p => p.RatingLogs)
             .Include(p => p.Album)
             .FirstOrDefaultAsync(p => p.Id == photoId);
 
@@ -60,76 +42,40 @@ public class ScoringService
             throw new InvalidOperationException($"Photo {photoId} not found");
         }
 
-        // 验证打 6 分的条件
-        if (score == 6)
-        {
-            var sixPointPhotosInAlbum = await _context.Photos
-                .CountAsync(p => p.AlbumId == photo.AlbumId && p.IndependentScore >= 5.5);
-
-            var isEligibleForSix = photo.RatingCount >= 8 &&
-                                  (photo.IndependentScore ?? 0) >= 5 &&
-                                  photo.Album.AlbumScore >= 3.0 &&
-                                  sixPointPhotosInAlbum < 3;
-            
-            if (!isEligibleForSix)
-            {
-                if (photo.RatingCount < 8)
-                    throw new InvalidOperationException("打分次数不足 8 次，无法评 6 分。");
-                if ((photo.IndependentScore ?? 0) < 5)
-                    throw new InvalidOperationException("最后一次得分不足 5 分，无法评 6 分。");
-                if (photo.Album.AlbumScore < 3.0)
-                    throw new InvalidOperationException("相册分不足 3.0，无法评 6 分。");
-                if (sixPointPhotosInAlbum >= 3)
-                    throw new InvalidOperationException("同一个相册不得超过 3 张 6 分图。");
-                
-                throw new InvalidOperationException("该照片目前不符合评 6 分的条件。");
-            }
-        }
-
-        // 记录打分日志
+        var previousScore = photo.IndependentScore;
         var ratingLog = new RatingLog
         {
             PhotoId = photoId,
             Score = score,
+            PreviousScore = previousScore,
+            PredictionAtRating = previousScore.HasValue ? null : photo.EstimatedScore,
+            PredictionModelVersion = previousScore.HasValue ? null : photo.EstimatedScoreModelVersion,
+            IsCorrection = previousScore.HasValue,
             RatedAt = DateTime.UtcNow
         };
 
         _context.RatingLogs.Add(ratingLog);
-        photo.RatingCount++;
+
+        // Old schema columns are neutralized for rolling-upgrade compatibility only.
+        // RatingCount is intentionally left frozen: repeated ratings are corrections.
+        photo.IsFixed = false;
+        photo.Knownness = 0;
         photo.LastRatedAt = DateTime.UtcNow;
+        photo.IndependentScore = score;
+        photo.OverallScore = score;
 
-        // 检查最后三次打分是否相同
-        var lastThreeScores = photo.RatingLogs
-            .OrderByDescending(r => r.RatedAt)
-            .Take(3)
-            .Select(r => r.Score)
-            .ToList();
-
-        if (lastThreeScores.Count >= 3 && lastThreeScores.Distinct().Count() == 1)
+        var state = await _context.SystemStates.FirstOrDefaultAsync();
+        if (state == null)
         {
-            photo.IsFixed = true;
-            photo.IndependentScore = lastThreeScores[0];
-        }
-        else if (photo.RatingCount >= 3)
-        {
-            // 计算独立分（最近的打分）
-            photo.IndependentScore = score;
-        }
-        else
-        {
-            photo.IndependentScore = score;
+            state = new SystemState();
+            _context.SystemStates.Add(state);
         }
 
+        state.LastRatingAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        // 更新全局打分时间水印
-        await UpdateLastRatingAtAsync();
-
-        // 更新相册统计
-        await UpdateAlbumScoresAsync(photo.AlbumId);
-
-        // 更新该相册下所有照片的整体分和已知性
-        await UpdatePhotoScoresInAlbumAsync(photo.AlbumId);
+        // 相册数据现在只是报表统计，绝不再回灌任何照片。
+        await UpdateAlbumScoreAsync(photo.AlbumId);
 
         // 重新获取更新后的照片
         photo = await _context.Photos
@@ -152,124 +98,114 @@ public class ScoringService
         }
     }
 
-    private async Task UpdateLastRatingAtAsync()
-    {
-        var state = await _context.SystemStates.FirstOrDefaultAsync();
-        if (state == null)
-        {
-            state = new SystemState();
-            _context.SystemStates.Add(state);
-        }
-        state.LastRatingAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-    }
-
     /// <summary>
-    /// 更新相册分数和统计（供外部调用）
+    /// 更新相册报表统计。AlbumScore 是贝叶斯修正后的人工均分，不参与照片评分。
     /// </summary>
     public async Task UpdateAlbumScoreAsync(string albumId)
     {
-        await UpdateAlbumScoresAsync(albumId);
-        await UpdatePhotoScoresInAlbumAsync(albumId);
-    }
-
-    /// <summary>
-    /// 更新相册分数和统计
-    /// </summary>
-    private async Task UpdateAlbumScoresAsync(string albumId)
-    {
-        var album = await _context.Albums
-            .Include(a => a.Photos)
-            .FirstOrDefaultAsync(a => a.AlbumId == albumId);
+        var album = await _context.Albums.FirstOrDefaultAsync(a => a.AlbumId == albumId);
 
         if (album == null) return;
 
-        album.PhotoCount = album.Photos.Count();
-
-        var ratedPhotos = album.Photos.Where(p => p.IndependentScore.HasValue).ToList();
-        album.KnownRate = album.PhotoCount > 0 ? (double)ratedPhotos.Count / album.PhotoCount : 0;
-
-        // 计算相册分：取前20%高分照片的均值
-        if (ratedPhotos.Count > 0)
-        {
-            var avgRated = ratedPhotos.Average(p => p.IndependentScore!.Value);
-            var unratedScore = Math.Max(0, avgRated - 1); // 未打分的照片分数为 avg - 1
-            
-            // 构建所有照片的分数列表（已评分用独立分，未评分用 unratedScore）
-            var allPhotoScores = new List<double>();
-            foreach (var photo in album.Photos)
+        var summary = await _context.Photos
+            .Where(p => p.AlbumId == albumId)
+            .GroupBy(_ => 1)
+            .Select(g => new
             {
-                allPhotoScores.Add(photo.IndependentScore ?? unratedScore);
-            }
-            
-            // 排序并取前80%（至少取1张）
-            var sortedScores = allPhotoScores.OrderByDescending(s => s).ToList();
-            var top80PercentCount = Math.Max(1, (int)Math.Ceiling(sortedScores.Count * 0.8));
-            var topScores = sortedScores.Take(top80PercentCount);
-            
-            album.AlbumScore = topScores.Average();
-        }
-        else
-        {
-            album.AlbumScore = 2.5; // 默认分数
-        }
+                PhotoCount = g.Count(),
+                RatedCount = g.Count(p => p.IndependentScore != null),
+                Average = g.Where(p => p.IndependentScore != null).Average(p => p.IndependentScore),
+                Highest = g.Max(p => p.IndependentScore),
+                Lowest = g.Min(p => p.IndependentScore),
+                AverageSquare = g.Where(p => p.IndependentScore != null)
+                    .Average(p => p.IndependentScore * p.IndependentScore)
+            })
+            .FirstOrDefaultAsync();
 
-        // 计算标准差、最高分、最低分
-        if (album.Photos.Count() > 0)
-        {
-            var scores = album.Photos.Select(p => p.IndependentScore ?? album.AlbumScore).ToList();
-            var mean = scores.Average();
-            var variance = scores.Sum(s => Math.Pow(s - mean, 2)) / scores.Count;
-            album.StandardDeviation = Math.Sqrt(variance);
+        var globalAverage = await _context.Photos
+            .Where(p => p.IndependentScore != null)
+            .AverageAsync(p => (double?)p.IndependentScore) ?? 3.0;
 
-            album.HighestScore = scores.Max();
-            album.LowestScore = scores.Min();
-        }
+        ApplyAlbumSummary(
+            album,
+            summary?.PhotoCount ?? 0,
+            summary?.RatedCount ?? 0,
+            summary?.Average,
+            summary?.AverageSquare,
+            summary?.Highest,
+            summary?.Lowest,
+            globalAverage);
 
         album.UpdatedAt = DateTime.UtcNow;
-
         await _context.SaveChangesAsync();
     }
 
     /// <summary>
-    /// 更新相册中所有照片的整体分和已知性
+    /// 批量重建所有相册报表统计，供文件同步和管理员使用。
     /// </summary>
-    private async Task UpdatePhotoScoresInAlbumAsync(string albumId)
+    public async Task RebuildAllAlbumStatsAsync()
     {
-        var album = await _context.Albums
-            .Include(a => a.Photos)
-            .FirstOrDefaultAsync(a => a.AlbumId == albumId);
+        var globalAverage = await _context.Photos
+            .Where(p => p.IndependentScore != null)
+            .AverageAsync(p => (double?)p.IndependentScore) ?? 3.0;
 
-        if (album == null) return;
+        var summaries = await _context.Photos
+            .GroupBy(p => p.AlbumId)
+            .Select(g => new
+            {
+                AlbumId = g.Key,
+                PhotoCount = g.Count(),
+                RatedCount = g.Count(p => p.IndependentScore != null),
+                Average = g.Where(p => p.IndependentScore != null).Average(p => p.IndependentScore),
+                Highest = g.Max(p => p.IndependentScore),
+                Lowest = g.Min(p => p.IndependentScore),
+                AverageSquare = g.Where(p => p.IndependentScore != null)
+                    .Average(p => p.IndependentScore * p.IndependentScore)
+            })
+            .ToDictionaryAsync(x => x.AlbumId);
 
-        foreach (var photo in album.Photos)
+        var albums = await _context.Albums.ToListAsync();
+        foreach (var album in albums)
         {
-            // 计算整体分：70%独立分 + 30%相册分
-            if (photo.IndependentScore.HasValue)
+            if (summaries.TryGetValue(album.AlbumId, out var summary))
             {
-                photo.OverallScore = photo.IndependentScore.Value * 0.7 + album.AlbumScore * 0.3;
+                ApplyAlbumSummary(album, summary.PhotoCount, summary.RatedCount, summary.Average,
+                    summary.AverageSquare, summary.Highest, summary.Lowest, globalAverage);
             }
             else
             {
-                photo.OverallScore = album.AlbumScore;
+                ApplyAlbumSummary(album, 0, 0, null, null, null, null, globalAverage);
             }
-
-            // 计算已知性
-            var ratingCountScore = Math.Min(photo.RatingCount, 5) * 10.0; // 最多50分
-            var albumKnownRateScore = album.KnownRate * 50.0; // 最多50分
-
-            if (photo.IsFixed)
-            {
-                // 如果已固定（最后三次打分相同），则基础分为50
-                photo.Knownness = 50 + albumKnownRateScore;
-            }
-            else
-            {
-                photo.Knownness = ratingCountScore + albumKnownRateScore;
-            }
+            album.UpdatedAt = DateTime.UtcNow;
         }
 
         await _context.SaveChangesAsync();
+    }
+
+    private static void ApplyAlbumSummary(
+        Album album,
+        int photoCount,
+        int ratedCount,
+        double? average,
+        double? averageSquare,
+        double? highest,
+        double? lowest,
+        double globalAverage)
+    {
+        const double priorStrength = 5.0;
+
+        album.PhotoCount = photoCount;
+        album.RatedPhotoCount = ratedCount;
+        album.KnownRate = photoCount > 0 ? (double)ratedCount / photoCount : 0;
+        album.AverageManualScore = average;
+        album.AlbumScore = ratedCount > 0
+            ? (average!.Value * ratedCount + globalAverage * priorStrength) / (ratedCount + priorStrength)
+            : globalAverage;
+        album.HighestScore = highest;
+        album.LowestScore = lowest;
+        album.StandardDeviation = average.HasValue && averageSquare.HasValue
+            ? Math.Sqrt(Math.Max(0, averageSquare.Value - average.Value * average.Value))
+            : 0;
     }
 
     /// <summary>
@@ -302,200 +238,6 @@ public class ScoringService
         }
 
         return items.Last();
-    }
-
-    /// <summary>
-    /// 猜测单张照片的分数（使用分层KNN平衡算法 + SmoothStep 平滑）
-    /// </summary>
-    public async Task<double> GuessScoreInternal(Photo targetPhoto)
-    {
-        var vector = await EnsureFeatureVectorPublic(targetPhoto);
-        if (vector == null)
-        {
-            return 0;
-        }
-
-        var result = await GuessScoreBalancedInternal(targetPhoto, vector);
-        return result.PredictedScore;
-    }
-
-    /// <summary>
-    /// 批量猜测照片分数（优化性能）
-    /// </summary>
-    public async Task BatchGuessScoresInternal(List<Photo> targetPhotos)
-    {
-        // 1. 确保所有照片都有特征向量
-        foreach (var photo in targetPhotos)
-        {
-            await EnsureFeatureVectorPublic(photo, save: false);
-        }
-
-        await _context.SaveChangesAsync();
-
-        // 2. 获取所有已评分照片的向量和分数
-        var ratedPhotos = await _context.Photos
-            .Where(p => p.FeatureVector != null && p.IndependentScore != null)
-            .AsNoTracking()
-            .Select(p => new { p.IndependentScore, p.FeatureVector })
-            .ToListAsync();
-
-        if (ratedPhotos.Count == 0)
-        {
-            // 如果库里没有任何已评分照片，无法预测
-            foreach (var targetPhoto in targetPhotos)
-            {
-                targetPhoto.EstimatedScore = 0;
-                targetPhoto.EstimatedScoreUpdatedAt = DateTime.UtcNow;
-            }
-            await _context.SaveChangesAsync();
-            return;
-        }
-
-        // 3. 将已评分照片按分数分组
-        var ratedGroups = ratedPhotos
-            .GroupBy(p => (int)Math.Round(p.IndependentScore!.Value))
-            .ToDictionary(
-                g => g.Key, 
-                g => g.Select(p => ImageAnalysisService.ByteArrayToFloatArray(p.FeatureVector!)).ToList()
-            );
-
-        // 4. 对每张目标照片进行预测
-        foreach (var targetPhoto in targetPhotos)
-        {
-            targetPhoto.EstimatedScoreUpdatedAt = DateTime.UtcNow;
-
-            if (targetPhoto.FeatureVector == null)
-            {
-                targetPhoto.EstimatedScore = 0;
-                continue;
-            }
-
-            var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetPhoto.FeatureVector);
-            var scoreConfidences = new Dictionary<int, double>();
-
-            for (int i = 0; i <= 6; i++)
-            {
-                if (!ratedGroups.ContainsKey(i))
-                {
-                    scoreConfidences[i] = 0;
-                    continue;
-                }
-
-                var groupVectors = ratedGroups[i];
-                var similarities = new List<double>();
-                foreach (var photoVector in groupVectors)
-                {
-                    var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
-                    similarities.Add(Math.Max(0, similarity));
-                }
-
-                var bestMatchSimilarity = similarities.OrderByDescending(x => x).Take(3).Average();
-                scoreConfidences[i] = Math.Pow(bestMatchSimilarity, 30);
-            }
-
-            double totalWeight = scoreConfidences.Values.Sum();
-            if (totalWeight == 0)
-            {
-                targetPhoto.EstimatedScore = 0;
-            }
-            else
-            {
-                double weightedSum = scoreConfidences.Sum(x => x.Key * x.Value);
-                var rawPredictedScore = weightedSum / totalWeight;
-                targetPhoto.EstimatedScore = ApplySmoothStep(rawPredictedScore);
-            }
-        }
-
-        await _context.SaveChangesAsync();
-    }
-
-    /// <summary>
-    /// 使用分层KNN平衡算法猜测照片分数，并应用 SmoothStep 平滑
-    /// </summary>
-    public async Task<(double PredictedScore, Dictionary<int, double> Votes)> GuessScoreBalancedInternal(Photo targetPhoto, byte[] targetVectorBytes)
-    {
-        // 1. 使用 Window Function 分层获取每个分数段的前20名相似照片
-        // 这样可以避免高分照片数量过多导致的样本偏差
-        var similarRatedPhotos = await _context.Photos
-            .FromSqlInterpolated($@"
-                WITH Ranked AS (
-                    SELECT 
-                        Id,
-                        IndependentScore,
-                        VectorDistance(FeatureVector, {targetVectorBytes}) as Distance,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY CAST(ROUND(IndependentScore) AS INTEGER) 
-                            ORDER BY VectorDistance(FeatureVector, {targetVectorBytes}) ASC
-                        ) as Rank
-                    FROM Photos
-                    WHERE Id != {targetPhoto.Id} 
-                      AND FeatureVector IS NOT NULL 
-                      AND IndependentScore IS NOT NULL
-                )
-                SELECT p.* 
-                FROM Photos p
-                INNER JOIN Ranked r ON p.Id = r.Id
-                WHERE r.Rank <= 20")
-            .AsNoTracking()
-            .ToListAsync();
-
-        if (similarRatedPhotos.Count == 0)
-        {
-            return (0, new Dictionary<int, double>());
-        }
-
-        var targetVector = ImageAnalysisService.ByteArrayToFloatArray(targetVectorBytes);
-        
-        // 2. 按分数分组计算相关性均值
-        var scoreGroups = similarRatedPhotos
-            .GroupBy(p => (int)Math.Round(p.IndependentScore!.Value))
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var scoreConfidences = new Dictionary<int, double>();
-
-        // 遍历可能的 0-6 分
-        for (int i = 0; i <= 6; i++)
-        {
-            if (!scoreGroups.ContainsKey(i))
-            {
-                scoreConfidences[i] = 0;
-                continue;
-            }
-
-            var photosInGroup = scoreGroups[i];
-
-            // 【核心优化】：不要算平均值！
-            // 如果我是烂片，我可能只跟库里某一张烂片特别像，跟其他烂片不像。
-            // 所以取 Top 3 的均值，代表这个分数段的"最佳匹配能力"。
-            var similarities = new List<double>();
-            foreach (var photo in photosInGroup)
-            {
-                var photoVector = ImageAnalysisService.ByteArrayToFloatArray(photo.FeatureVector!);
-                var similarity = ImageAnalysisService.CalculateCosineSimilarity(targetVector, photoVector);
-                similarities.Add(Math.Max(0, similarity));
-            }
-            
-            // 取最像的前3个的平均相似度
-            var bestMatchSimilarity = similarities.OrderByDescending(x => x).Take(3).Average();
-
-            // 非线性放大：0.8 和 0.85 的差距要变成 1 和 10 的差距
-            scoreConfidences[i] = Math.Pow(bestMatchSimilarity, 30);
-        }
-
-        // 3. 加权平均算出原始预测分
-        double totalWeight = scoreConfidences.Values.Sum();
-        if (totalWeight == 0) return (0, scoreConfidences);
-
-        double weightedSum = scoreConfidences.Sum(x => x.Key * x.Value);
-        var rawPredictedScore = weightedSum / totalWeight;
-        
-        // 4. 【新增】应用 SmoothStep 算法平滑分数
-        var smoothedScore = ApplySmoothStep(rawPredictedScore);
-        
-        // 归一化输出用于前端显示
-        var displayVotes = scoreConfidences.ToDictionary(kv => kv.Key, kv => Math.Round(kv.Value / totalWeight * 100, 2));
-
-        return (smoothedScore, displayVotes);
     }
 
     /// <summary>
