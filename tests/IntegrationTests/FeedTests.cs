@@ -68,4 +68,48 @@ public class FeedTests
         CollectionAssert.AreEqual(new[] { "null-second.jpg" }, thirdPage.Select(p => p.FilePath).ToArray());
         Assert.IsFalse(firstPage.Concat(secondPage).Concat(thirdPage).Any(p => p.FilePath == "rated.jpg"));
     }
+
+    [TestMethod]
+    public async Task SeededFeedRotatesBetweenSessionsAndPagesWithoutDuplicates()
+    {
+        using (var scope = _server!.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            context.Albums.Add(new Album { AlbumId = "rotating-feed", Name = "Rotating Feed" });
+            context.Photos.AddRange(Enumerable.Range(0, 80).Select(index => new Photo
+            {
+                FilePath = $"candidate-{index:D2}.jpg",
+                AlbumId = "rotating-feed",
+                EstimatedScore = 4.5 - index * 0.002
+            }));
+            context.Photos.Add(new Photo
+            {
+                FilePath = "rated-candidate.jpg",
+                AlbumId = "rotating-feed",
+                IndependentScore = 6,
+                EstimatedScore = 6
+            });
+            await context.SaveChangesAsync();
+        }
+
+        const int seedA = 101;
+        const int seedB = 202;
+        var firstA = await _http.GetFromJsonAsync<List<Photo>>($"/api/photos/feed?size=10&seed={seedA}");
+        var repeatedA = await _http.GetFromJsonAsync<List<Photo>>($"/api/photos/feed?size=10&seed={seedA}");
+        var firstB = await _http.GetFromJsonAsync<List<Photo>>($"/api/photos/feed?size=10&seed={seedB}");
+
+        Assert.IsNotNull(firstA);
+        Assert.IsNotNull(repeatedA);
+        Assert.IsNotNull(firstB);
+        CollectionAssert.AreEqual(firstA.Select(p => p.Id).ToArray(), repeatedA.Select(p => p.Id).ToArray());
+        CollectionAssert.AreNotEqual(firstA.Select(p => p.Id).ToArray(), firstB.Select(p => p.Id).ToArray());
+        Assert.IsTrue(firstA.All(p => p.FeedRank.HasValue));
+        Assert.IsFalse(firstA.Any(p => p.FilePath == "rated-candidate.jpg"));
+
+        var cursor = firstA[^1];
+        var secondA = await _http.GetFromJsonAsync<List<Photo>>(
+            $"/api/photos/feed?size=10&seed={seedA}&beforeRank={cursor.FeedRank}&beforeId={cursor.Id}");
+        Assert.IsNotNull(secondA);
+        Assert.IsFalse(firstA.Select(p => p.Id).Intersect(secondA.Select(p => p.Id)).Any());
+    }
 }

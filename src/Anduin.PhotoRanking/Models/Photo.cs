@@ -131,5 +131,12 @@ public class Photo
     [NotMapped]
     public double? DisplayScore => IndependentScore ?? EstimatedScore;
 
+    /// <summary>
+    /// 当前推荐会话内的稳定排序游标。它只用于 Feed 分页，不是照片分数，
+    /// 不持久化，也不参与模型训练或统计。
+    /// </summary>
+    [NotMapped]
+    public long? FeedRank { get; set; }
+
     public DateTime LastModified { get; set; } = DateTime.UtcNow;
 }

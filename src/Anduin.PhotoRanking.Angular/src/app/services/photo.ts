@@ -44,6 +44,7 @@ export interface Photo {
   estimatedScoreModelVersion?: string;
   predictionUncertainty?: number | null;
   predictionNovelty?: number | null;
+  feedRank?: number | null;
   createdAt: string;
 }
 
@@ -97,13 +98,24 @@ export class PhotoService {
     return `${this.apiBase}/images/${encodeURI(filePath)}`;
   }
 
-  getFeed(size: number = 20, beforeScore?: number, beforeId?: number): Observable<Photo[]> {
+  getFeed(
+    size: number = 20,
+    beforeScore?: number,
+    beforeId?: number,
+    seed?: number,
+    beforeRank?: number): Observable<Photo[]> {
     let url = `${this.apiBase}/photos/feed?size=${size}`;
     if (beforeId !== undefined) {
       url += `&beforeId=${beforeId}`;
     }
     if (beforeScore !== undefined) {
       url += `&beforeScore=${beforeScore}`;
+    }
+    if (seed !== undefined) {
+      url += `&seed=${seed}`;
+    }
+    if (beforeRank !== undefined) {
+      url += `&beforeRank=${beforeRank}`;
     }
     return this.http.get<Photo[]>(url);
   }

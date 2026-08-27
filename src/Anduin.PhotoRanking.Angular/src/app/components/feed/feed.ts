@@ -17,7 +17,9 @@ export class FeedComponent implements OnInit {
   isLoading = false;
   hasMore = true;
   pageSize = 20;
+  private readonly feedSeed = Math.floor(Math.random() * 2_147_483_647);
   private cursorScore: number | undefined;
+  private cursorRank: number | undefined;
   private cursorId: number | undefined;
 
   viewerOpen = false;
@@ -44,7 +46,12 @@ export class FeedComponent implements OnInit {
     if (this.isLoading || !this.hasMore) return;
 
     this.isLoading = true;
-    this.photoService.getFeed(this.pageSize, this.cursorScore, this.cursorId).subscribe({
+    this.photoService.getFeed(
+      this.pageSize,
+      this.cursorScore,
+      this.cursorId,
+      this.feedSeed,
+      this.cursorRank).subscribe({
       next: (newPhotos) => {
         if (newPhotos.length === 0) {
           this.hasMore = false;
@@ -55,6 +62,7 @@ export class FeedComponent implements OnInit {
 
           const last = newPhotos[newPhotos.length - 1];
           this.cursorScore = last.predictedScore ?? last.estimatedScore ?? undefined;
+          this.cursorRank = last.feedRank ?? undefined;
           this.cursorId = last.id;
           if (uniquePhotos.length === 0) {
             this.hasMore = false;

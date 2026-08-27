@@ -10,6 +10,10 @@ namespace Anduin.PhotoRanking.Controllers;
 [Route("api/[controller]")]
 public class PhotosController : ControllerBase
 {
+    private const int FeedCandidatePoolSize = 5000;
+    private const long FeedScoreScale = 1_000_000;
+    private const uint FeedJitterUnits = 250_000;
+
     private readonly AppDbContext _context;
     private readonly ScoringService _scoringService;
     private readonly PersonalizedPredictionService _predictionService;
@@ -35,7 +39,9 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// 获取首页 For You 照片流。只返回未评分照片，按个人预测分稳定降序。
+    /// 获取首页 For You 照片流。只返回未评分照片。
+    /// 新客户端传入会话种子后，会在高预测分候选池内做稳定的加权轮换；
+    /// 不传种子的旧客户端继续获得严格预测分降序，确保滚动升级兼容。
     /// </summary>
     [HttpGet("feed")]
     public async Task<ActionResult<List<Photo>>> GetFeed(
@@ -43,12 +49,23 @@ public class PhotosController : ControllerBase
         [FromQuery] int size = 20,
         [FromQuery] int? take = null,
         [FromQuery] double? beforeScore = null,
-        [FromQuery] int? beforeId = null)
+        [FromQuery] int? beforeId = null,
+        [FromQuery] int? seed = null,
+        [FromQuery] long? beforeRank = null)
     {
         var pageSize = Math.Clamp(take ?? size, 1, 100);
         page = Math.Max(1, page);
 
+        // A client upgraded in the middle of a browsing session may have the old
+        // score cursor but no seeded-rank cursor yet. Keep that session on the
+        // legacy path so it cannot jump back to page one and show duplicates.
+        if (seed.HasValue && (!beforeId.HasValue || beforeRank.HasValue))
+        {
+            return Ok(await GetSeededFeedAsync(seed.GetValueOrDefault(), beforeRank, beforeId, pageSize));
+        }
+
         var query = _context.Photos
+            .AsNoTracking()
             .Include(p => p.Album)
             .Where(p => p.IndependentScore == null);
 
@@ -77,6 +94,79 @@ public class PhotosController : ControllerBase
             .ToListAsync();
 
         return Ok(photos);
+    }
+
+    private async Task<List<Photo>> GetSeededFeedAsync(
+        int seed,
+        long? beforeRank,
+        int? beforeId,
+        int pageSize)
+    {
+        // Fetch only lightweight ranking fields for a broad quality pool. Loading
+        // full Photo rows here would unnecessarily read thousands of CLIP vectors.
+        var candidatePool = await _context.Photos
+            .AsNoTracking()
+            .Where(p => p.IndependentScore == null)
+            .OrderByDescending(p => p.EstimatedScore)
+            .ThenBy(p => p.Id)
+            .Select(p => new { p.Id, p.EstimatedScore })
+            .Take(FeedCandidatePoolSize)
+            .ToListAsync();
+
+        var rankedCandidates = candidatePool
+            .Select(candidate => new
+            {
+                candidate.Id,
+                Rank = CalculateFeedRank(candidate.Id, candidate.EstimatedScore, seed)
+            })
+            .OrderByDescending(candidate => candidate.Rank)
+            .ThenBy(candidate => candidate.Id);
+
+        if (beforeRank.HasValue && beforeId.HasValue)
+        {
+            rankedCandidates = rankedCandidates
+                .Where(candidate =>
+                    candidate.Rank < beforeRank.Value ||
+                    (candidate.Rank == beforeRank.Value && candidate.Id > beforeId.Value))
+                .OrderByDescending(candidate => candidate.Rank)
+                .ThenBy(candidate => candidate.Id);
+        }
+
+        var pageCandidates = rankedCandidates.Take(pageSize).ToList();
+        if (pageCandidates.Count == 0)
+        {
+            return [];
+        }
+
+        var pageIds = pageCandidates.Select(candidate => candidate.Id).ToList();
+        var photosById = await _context.Photos
+            .AsNoTracking()
+            .Include(p => p.Album)
+            .Where(p => pageIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id);
+
+        return pageCandidates.Select(candidate =>
+        {
+            var photo = photosById[candidate.Id];
+            photo.FeedRank = candidate.Rank;
+            return photo;
+        }).ToList();
+    }
+
+    private static long CalculateFeedRank(int photoId, double? estimatedScore, int seed)
+    {
+        // A compact integer mixer gives every (photo, session) pair a stable
+        // pseudo-random value without asking SQLite to randomly sort 385k rows.
+        var mixed = unchecked((uint)photoId * 747_796_405u + (uint)seed);
+        mixed = unchecked((mixed ^ (mixed >> 16)) * 2_246_822_519u);
+        mixed = unchecked((mixed ^ (mixed >> 13)) * 3_266_489_917u);
+        mixed ^= mixed >> 16;
+
+        var scoreUnits = (long)Math.Round(
+            (estimatedScore ?? -1) * FeedScoreScale,
+            MidpointRounding.AwayFromZero);
+        var jitter = mixed % (FeedJitterUnits + 1);
+        return scoreUnits + jitter;
     }
 
     /// <summary>
