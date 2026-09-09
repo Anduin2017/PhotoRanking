@@ -8,6 +8,8 @@
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- SDCA and KMeans use managed CPU math on ARM64; ML.NET still has an x86/x64-only build guard. -->
+    <EnableMLUnsupportedPlatformTargetCheck Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">false</EnableMLUnsupportedPlatformTargetCheck>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aiursoft.DbTools.Sqlite" Version="10.0.34" />
