@@ -6,7 +6,13 @@ ARG PROJ_NAME="Anduin.PhotoRanking"
 # ============================
 FROM --platform=$BUILDPLATFORM hub.aiursoft.com/python:3.11 AS model-builder
 WORKDIR /src
-RUN pip install torch transformers onnx onnxscript --no-cache-dir
+# Export runs on CPU; avoid downloading the CUDA runtime and GPU libraries.
+ENV PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install transformers onnx onnxscript
 COPY scripts/export_onnx.py ./scripts/
 # Create expected directory structure for the script
 RUN mkdir -p src/Anduin.PhotoRanking/models
