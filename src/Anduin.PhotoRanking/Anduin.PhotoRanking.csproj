@@ -8,7 +8,6 @@
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- SDCA and KMeans use managed CPU math on ARM64; ML.NET still has an x86/x64-only build guard. -->
     <EnableMLUnsupportedPlatformTargetCheck Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">false</EnableMLUnsupportedPlatformTargetCheck>
   </PropertyGroup>
   <ItemGroup>
@@ -23,7 +22,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.ML" Version="5.0.0" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
     <PackageReference Include="SkiaSharp" Version="4.152.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.0" />
   </ItemGroup>
