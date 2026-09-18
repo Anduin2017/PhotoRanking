@@ -23,8 +23,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.ML" Version="5.0.0" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
-    <PackageReference Include="SkiaSharp" Version="4.152.0" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.0" />
+    <PackageReference Include="SkiaSharp" Version="4.152.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.1" />
   </ItemGroup>
   <ItemGroup>
     <None Update="models\**">
