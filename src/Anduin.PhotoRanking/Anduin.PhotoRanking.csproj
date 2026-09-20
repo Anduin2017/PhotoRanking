@@ -11,7 +11,7 @@
     <EnableMLUnsupportedPlatformTargetCheck Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">false</EnableMLUnsupportedPlatformTargetCheck>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aiursoft.DbTools.Sqlite" Version="10.0.35" />
+    <PackageReference Include="Aiursoft.DbTools.Sqlite" Version="10.0.36" />
     <PackageReference Include="Aiursoft.WebTools" Version="10.0.16" />
     <PackageReference Include="Aiursoft.Canon" Version="10.0.14" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
