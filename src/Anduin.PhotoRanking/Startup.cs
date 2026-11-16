@@ -60,6 +60,16 @@ public class Startup : IWebStartup
 
     public void Configure(WebApplication app)
     {
+        // Revalidate the SPA shell so it references the assets from the current release.
+        app.Use(async (context, next) =>
+        {
+            if (!Path.HasExtension(context.Request.Path.Value) ||
+                string.Equals(Path.GetExtension(context.Request.Path.Value), ".html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Headers.CacheControl = "no-cache";
+            }
+            await next();
+        });
         app.UseStaticFiles();
         var distPath = Path.Combine(app.Environment.WebRootPath, "dist");
         if (Directory.Exists(distPath))
