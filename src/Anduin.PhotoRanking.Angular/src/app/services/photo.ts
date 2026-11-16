@@ -53,6 +53,17 @@ export interface AlbumDetails {
   photos: Photo[];
 }
 
+export interface SummarySettings {
+  prompt1: string;
+  prompt2: string;
+  prompt3: string;
+  topPercent: number;
+  promptsModifiedAt?: string;
+  configured?: boolean;
+  targetCount?: number;
+  completedCount?: number;
+}
+
 export interface GlobalStats {
   waitingCount: number;
   ratedCount: number;
@@ -93,6 +104,21 @@ export class PhotoService {
   public ratingChanged$ = new Subject<void>();
 
   constructor(private http: HttpClient) { }
+
+  getSummarySettings(): Observable<SummarySettings> {
+    return this.http.get<SummarySettings>(`${this.apiBase}/summary/settings`);
+  }
+
+  saveSummarySettings(settings: SummarySettings): Observable<SummarySettings> {
+    return this.http.put<SummarySettings>(`${this.apiBase}/summary/settings`, {
+      prompt1: settings.prompt1, prompt2: settings.prompt2,
+      prompt3: settings.prompt3, topPercent: settings.topPercent
+    });
+  }
+
+  getSummary(photoId: number): Observable<{ summary: string | null }> {
+    return this.http.get<{ summary: string | null }>(`${this.apiBase}/summary/photos/${photoId}`);
+  }
 
   getImageUrl(filePath: string): string {
     return `${this.apiBase}/images/${encodeURI(filePath)}`;

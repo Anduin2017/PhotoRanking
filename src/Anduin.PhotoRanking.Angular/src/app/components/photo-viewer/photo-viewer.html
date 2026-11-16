@@ -8,6 +8,17 @@
         </div>
     </div>
 
+    <aside *ngIf="showSummary" class="summary-panel" aria-label="图片摘要" (click)="$event.stopPropagation()">
+        <div *ngIf="summary; else noSummary" #summaryScroller class="summary-scroller" tabindex="0"
+            (pointerdown)="startSummaryDrag($event)" (pointermove)="dragSummary($event)"
+            (pointerup)="endSummaryDrag()" (pointercancel)="endSummaryDrag()" (lostpointercapture)="endSummaryDrag()"
+            (wheel)="pauseSummaryScroll($event)" (keydown)="pauseSummaryScroll($event)"
+            (focus)="pauseSummaryScroll($event)">
+            <div class="summary-poem">{{ summary }}</div>
+        </div>
+        <ng-template #noSummary><p class="summary-empty">此图片尚未摘要</p></ng-template>
+    </aside>
+
     <button class="viewer-close" (click)="onClose()" [class.hidden]="!showInfo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -50,6 +61,10 @@
         </div>
 
         <div class="viewer-rating">
+            <label class="summary-toggle">
+                <input type="checkbox" [(ngModel)]="showSummary" (ngModelChange)="toggleSummary()">
+                显示图片摘要
+            </label>
             <div class="rating-score-buttons">
                 <button class="rating-btn"
                         *ngFor="let score of scoreOptions"

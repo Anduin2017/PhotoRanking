@@ -314,3 +314,33 @@
         display: none;
     }
 }
+.summary-panel {
+    position: absolute;
+    z-index: 8;
+    right: clamp(1rem, 4vw, 5rem);
+    top: 42%;
+    transform: translateY(-50%);
+    width: min(26vw, 25rem);
+    color: rgba(255, 255, 255, 0.88);
+    text-shadow: 0 1px 8px #000;
+    font-size: clamp(1rem, 1.5vw, 1.35rem);
+    line-height: 1.9;
+}
+
+.summary-scroller {
+    height: 13.3em;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    touch-action: none;
+    mask-image: linear-gradient(to bottom, transparent, #000 28.57%, #000 71.43%, transparent);
+}
+
+.summary-poem { white-space: pre-wrap; overflow-wrap: anywhere; padding-block: 3.8em; }
+.summary-empty { opacity: 0.55; }
+.summary-toggle { display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; cursor: pointer; }
+.summary-toggle input { accent-color: var(--primary);  }
+
+@media (max-width: 700px) {
+    .summary-panel { right: 1rem; top: 37%; width: min(65vw, 20rem); font-size: 1rem; }
+}

@@ -116,4 +116,27 @@ public class BasicTests
             }
         }
     }
+    [TestMethod]
+    public async Task SummarySettingsValidateInputAndDoNotExposeServerCredentials()
+    {
+        var response = await _http.GetAsync("/api/summary/settings");
+        response.EnsureSuccessStatusCode();
+        var settings = Newtonsoft.Json.Linq.JObject.Parse(await response.Content.ReadAsStringAsync());
+        Assert.AreEqual(3d, (double)settings["topPercent"]!);
+        Assert.IsNull(settings["apiKey"]);
+        Assert.IsFalse((bool)settings["configured"]!);
+        var invalid = await _http.PutAsJsonAsync("/api/summary/settings", new
+        {
+            prompt1 = "one", prompt2 = "two", prompt3 = "three", topPercent = 101
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+        var valid = await _http.PutAsJsonAsync("/api/summary/settings", new
+        {
+            prompt1 = "one", prompt2 = "two", prompt3 = "three", topPercent = 1
+        });
+        valid.EnsureSuccessStatusCode();
+        var missing = await _http.GetAsync("/api/summary/photos/12345");
+        Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
 }

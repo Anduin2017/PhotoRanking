@@ -24,6 +24,16 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   @Output() rated = new EventEmitter<Photo>();
 
   @ViewChild('swiperContainer') swiperContainer!: ElementRef;
+  @ViewChild('summaryScroller') summaryScroller?: ElementRef<HTMLElement>;
+
+  showSummary = true;
+  summary: string | null = null;
+  private destroyed = false;
+  private activePhotoId: number | null = null;
+  private summaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  private summaryScrollTimer: ReturnType<typeof setInterval> | null = null;
+  private summaryPauseUntil = 0;
+  private summaryPointer: { id: number; y: number; top: number } | null = null;
 
   swiper: Swiper | null = null;
   currentPhoto: Photo | null = null;
@@ -44,7 +54,16 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     private cdr: ChangeDetectorRef) { }
 
   ngOnInit() {
-    // Swiper init happens in ngAfterViewInit
+    this.summaryRefreshTimer = setInterval(() => this.refreshSummary(), 10000);
+    this.summaryScrollTimer = setInterval(() => {
+      const element = this.summaryScroller?.nativeElement;
+      if (!element || !this.showSummary || !this.summary || document.hidden ||
+          Date.now() < this.summaryPauseUntil || this.summaryPointer ||
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (element.scrollTop + element.clientHeight < element.scrollHeight - 1) {
+        element.scrollTop += 1;
+      }
+    }, 100);
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -64,6 +83,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
+    if (this.summaryRefreshTimer) clearInterval(this.summaryRefreshTimer);
+    if (this.summaryScrollTimer) clearInterval(this.summaryScrollTimer);
     this.stopSlideshow();
     if (this.swiper) {
       this.swiper.destroy();
@@ -128,8 +150,14 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   updateOverlay(photoId: number) {
     if (!photoId) return;
 
+    this.activePhotoId = photoId;
+    this.summary = null;
+    this.summaryPauseUntil = Date.now() + 3000;
+    if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
+    this.refreshSummary();
     this.guessedScore = null;
     this.photoService.getPhoto(photoId).subscribe(photo => {
+      if (this.activePhotoId !== photoId) return;
       this.currentPhoto = photo;
       if (photo.manualScore != null && photo.predictedScore != null) {
         this.guessedScore = photo.predictedScore;
@@ -137,6 +165,53 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     });
 
     this.photoService.viewPhoto(photoId).subscribe();
+  }
+
+  refreshSummary() {
+    const id = this.activePhotoId;
+    if (!id || !this.showSummary) return;
+    this.photoService.getSummary(id).subscribe({
+      next: result => {
+        if (this.destroyed || this.activePhotoId !== id) return;
+        if (this.summary !== result.summary) {
+          this.summary = result.summary;
+          if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
+          this.summaryPauseUntil = Date.now() + 3000;
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        if (this.activePhotoId === id) this.summary = null;
+      }
+    });
+  }
+
+  toggleSummary() {
+    if (this.showSummary) this.refreshSummary();
+  }
+
+  startSummaryDrag(event: PointerEvent) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const element = event.currentTarget as HTMLElement;
+    this.summaryPointer = { id: event.pointerId, y: event.clientY, top: element.scrollTop };
+    element.setPointerCapture(event.pointerId);
+    this.summaryPauseUntil = Date.now() + 10000;
+    event.stopPropagation();
+  }
+
+  dragSummary(event: PointerEvent) {
+    if (!this.summaryPointer || this.summaryPointer.id !== event.pointerId) return;
+    (event.currentTarget as HTMLElement).scrollTop = this.summaryPointer.top + this.summaryPointer.y - event.clientY;
+  }
+
+  endSummaryDrag() {
+    this.summaryPointer = null;
+    this.summaryPauseUntil = Date.now() + 10000;
+  }
+
+  pauseSummaryScroll(event: Event) {
+    event.stopPropagation();
+    this.summaryPauseUntil = Date.now() + 10000;
   }
 
   onClose() {
@@ -355,6 +430,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   @HostListener('window:wheel', ['$event'])
   onWheel(event: WheelEvent) {
+    if (event.target instanceof Element && event.target.closest('.summary-scroller')) return;
     if (this.swiper && this.swiper.zoom) {
       event.preventDefault();
       if (event.deltaY < 0) {

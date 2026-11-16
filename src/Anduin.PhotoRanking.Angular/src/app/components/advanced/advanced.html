@@ -1,4 +1,28 @@
 <div class="advanced-container main-content">
+    <section class="stat-section summary-settings" aria-labelledby="summary-settings-title">
+        <h2 class="stat-section-title" id="summary-settings-title">三段提示词摘要</h2>
+        <p>先用较小范围测试提示词，满意后扩大范围，后台会自动补齐。缩小范围不会删除已生成的摘要。</p>
+        <form *ngIf="summarySettings as settings" #summaryForm="ngForm" (ngSubmit)="saveSummaryPrompts()">
+            <label for="summary-prompt-1">第一段：观察画面</label>
+            <textarea id="summary-prompt-1" name="prompt1" [(ngModel)]="settings.prompt1" required maxlength="8000" rows="3" [disabled]="savingSummary"></textarea>
+            <label for="summary-prompt-2">第二段：结合上一轮回答继续提问</label>
+            <textarea id="summary-prompt-2" name="prompt2" [(ngModel)]="settings.prompt2" required maxlength="8000" rows="3" [disabled]="savingSummary"></textarea>
+            <label for="summary-prompt-3">第三段：生成最终摘要</label>
+            <textarea id="summary-prompt-3" name="prompt3" [(ngModel)]="settings.prompt3" required maxlength="8000" rows="3" [disabled]="savingSummary"></textarea>
+            <p class="summary-hint">保存修改后的提示词会立即使全部旧摘要失效，并重新生成当前范围内的摘要。</p>
+            <button type="submit" class="load-more-btn" [disabled]="summaryForm.invalid || savingSummary">{{ savingSummary ? '保存中…' : '保存提示词' }}</button>
+            <div class="summary-range">
+                <label for="summary-top-percent">全图库前 {{ settings.topPercent }}%</label>
+                <input id="summary-top-percent" name="topPercent" type="range" min="0" max="100" step="1"
+                    [(ngModel)]="settings.topPercent" (change)="saveSummaryPercent()" [disabled]="savingSummary">
+                <p class="summary-hint">按人工分优先、否则使用预测分排名。0% 暂停新增生成。</p>
+                <p role="status">当前范围已完成 {{ settings.completedCount ?? 0 }} / {{ settings.targetCount ?? 0 }} 张</p>
+            </div>
+            <p *ngIf="!settings.configured" class="summary-hint">尚未配置摘要模型连接，请联系管理员配置后开始生成。</p>
+        </form>
+        <p *ngIf="summaryMessage" role="status">{{ summaryMessage }}</p>
+        <p *ngIf="summaryError" role="alert">{{ summaryError }}</p>
+    </section>
     <div *ngIf="isLoading" class="loading-spinner"></div>
 
     <div *ngIf="!isLoading && stats">

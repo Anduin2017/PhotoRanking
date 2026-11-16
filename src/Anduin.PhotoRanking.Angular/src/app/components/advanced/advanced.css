@@ -206,3 +206,30 @@
         border-radius: 0;
     }
 }
+.summary-settings p {
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.summary-settings label {
+    display: block;
+    margin: 1.2rem 0 0.5rem;
+    font-weight: 600;
+}
+
+.summary-settings textarea {
+    box-sizing: border-box;
+    width: 100%;
+    resize: vertical;
+    padding: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font: inherit;
+    line-height: 1.6;
+}
+
+.summary-settings .summary-hint { font-size: 0.9rem; }
+.summary-range { margin-top: 1.5rem; }
+.summary-range input { width: 100%; accent-color: var(--primary); }

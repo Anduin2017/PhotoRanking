@@ -43,14 +43,23 @@ public class MigrationCompatibilityTests
             VALUES (7, 42, 5, '2026-01-02T00:00:00Z');
             """);
 
+        await context.Database.ExecuteSqlRawAsync("INSERT INTO SystemStates (Id, LastRatingAt, LastGlobalScoringAt) VALUES (1, '2026-01-01', '2026-01-01')");
         await migrator.MigrateAsync();
         context.ChangeTracker.Clear();
+
+        var summarySettings = await context.SystemStates.SingleAsync();
+        Assert.AreEqual(3d, summarySettings.SummaryTopPercent);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(summarySettings.SummaryPrompt1));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(summarySettings.SummaryPrompt2));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(summarySettings.SummaryPrompt3));
 
         var photo = await context.Photos.SingleAsync(p => p.Id == 42);
         var log = await context.RatingLogs.SingleAsync(l => l.Id == 7);
         var album = await context.Albums.SingleAsync(a => a.AlbumId == "existing-album");
 
         Assert.AreEqual("existing/photo.jpg", photo.FilePath);
+        Assert.IsNull(photo.Summary);
+        Assert.IsNull(photo.SummaryGeneratedAt);
         Assert.AreEqual(5.0, photo.IndependentScore);
         Assert.AreEqual(4.7, photo.OverallScore);
         Assert.AreEqual(4.4, photo.EstimatedScore);
