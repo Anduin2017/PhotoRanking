@@ -15,7 +15,7 @@ namespace Anduin.PhotoRanking.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
             modelBuilder.Entity("Anduin.PhotoRanking.Models.Album", b =>
                 {
@@ -124,6 +124,12 @@ namespace Anduin.PhotoRanking.Data.Migrations
 
                     b.Property<int>("RatingCount")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Summary")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SummaryGeneratedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ViewCount")
                         .HasColumnType("INTEGER");
@@ -238,6 +244,27 @@ namespace Anduin.PhotoRanking.Data.Migrations
 
                     b.Property<DateTime>("LastRatingAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("SummaryPrompt1")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SummaryPrompt2")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SummaryPrompt3")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("SummaryPromptsModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("SummaryTopPercent")
+                        .HasColumnType("REAL");
 
                     b.HasKey("Id");
 

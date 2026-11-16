@@ -85,6 +85,54 @@ Advanced statistics, directory browsing, exact-score browsing, duplicate review,
 
 The model contract, upgrade invariants, and current retrospective evaluation are documented in [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
 
+## Three-prompt photo summaries
+
+In **Advanced**, edit three prompts and save them. The background worker sends the
+photo with the first prompt, then carries the image and all previous questions and
+answers into the next two rounds. Only the final answer is stored as the photo's
+summary. For example, use the first two prompts to describe and interpret a photo,
+then ask the third prompt to write a poem.
+
+The coverage slider defaults to the top 3% of the whole library, ranked by
+`DisplayScore = IndependentScore ?? EstimatedScore` (manual score takes precedence,
+including zero). The target size is rounded up; ties use photo ID. Photos with
+neither score wait until a score becomes available. Increasing coverage fills the
+new range; decreasing it keeps existing summaries. Set coverage to 0% to pause new
+work. The worker checks every 10 seconds when idle, processes photos serially, and
+persists each completed photo so restarts resume missing work. A failed photo is
+retried on the next sweep without blocking other photos.
+
+Saving changed prompts immediately invalidates every old summary. Only photos in
+the current target range are regenerated. UTC prompt-modified and summary-generated
+timestamps determine freshness; a final atomic check prevents a response using old
+prompts from being published after an edit. Saving identical prompts or changing
+only coverage does not invalidate summaries. A useful workflow is to tune prompts
+at 1%, then increase coverage to 40% once satisfied.
+
+The viewer displays summaries as gently scrolling text beside the photo, with three
+clear lines and four fading lines. Drag vertically, use the mouse wheel, or focus
+the text and use the keyboard to read at your own pace. Automatic scrolling pauses
+after interaction and respects reduced-motion preferences. The bottom-bar **显示图片摘要**
+checkbox is enabled by default; photos without a current summary show **此图片尚未摘要**.
+
+Configure the server's existing `/data/appsettings.json` (or environment variables):
+
+```json
+"Summary": {
+  "Endpoint": "https://ollama.aiursoft.com/api/chat",
+  "Model": "aiursoft-thinking:latest",
+  "ApiKey": "YOUR_DEDICATED_GATEWAY_KEY"
+}
+```
+
+The equivalent environment keys are `Summary__Endpoint`, `Summary__Model`, and
+`Summary__ApiKey`. Generation waits until an API key is configured. Credentials are
+never returned by the settings API. PhotoRanking remains a private library behind
+its existing login proxy; these settings apply to that library. Generation sends a
+JPEG preview (at most 1536 pixels on the longest side, without source metadata) to
+the configured model endpoint. Keep the server behind authenticated access as for
+the existing photo and rating APIs.
+
 ## How to contribute
 
 There are many ways to contribute to the project: logging bugs, submitting pull requests, reporting issues, and creating suggestions.

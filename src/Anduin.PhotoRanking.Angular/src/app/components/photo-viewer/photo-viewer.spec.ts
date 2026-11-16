@@ -2,7 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PhotoViewerComponent } from './photo-viewer';
 import { PhotoService } from '../../services/photo';
 import { Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
+import { vi } from 'vitest';
 import { Photo } from '../../services/photo';
 
 describe('PhotoViewerComponent', () => {
@@ -11,6 +12,7 @@ describe('PhotoViewerComponent', () => {
 
   const photoServiceMock = {
     getImageUrl: (path: string) => path,
+    getSummary: (id: number) => of<{ summary: string | null }>({ summary: null }),
     getPhoto: (id: number) => of({}),
     viewPhoto: (id: number) => of({}),
     ratePhoto: (id: number, score: number) => of({}),
@@ -74,4 +76,29 @@ describe('PhotoViewerComponent', () => {
 
     expect(emittedPhoto).toEqual(updatedPhoto);
   });
+  it('ignores a previous photo summary arriving after navigation', () => {
+    const oldResponse = new Subject<{ summary: string | null }>();
+    const newResponse = new Subject<{ summary: string | null }>();
+    vi.spyOn(photoServiceMock, 'getSummary')
+      .mockReturnValueOnce(oldResponse).mockReturnValueOnce(newResponse);
+    component.updateOverlay(1);
+    component.updateOverlay(2);
+    newResponse.next({ summary: 'current poem' });
+    oldResponse.next({ summary: 'previous poem' });
+    expect(component.summary).toBe('current poem');
+  });
+
+  it('enables summaries by default and lets the summary wheel avoid photo zoom', () => {
+    expect(component.showSummary).toBe(true);
+    const zoom = { in: vi.fn(), out: vi.fn() };
+    component.swiper = { zoom } as any;
+    const scroller = document.createElement('div');
+    scroller.className = 'summary-scroller';
+    const event = new WheelEvent('wheel', { deltaY: 10 });
+    Object.defineProperty(event, 'target', { value: scroller });
+    component.onWheel(event);
+    expect(zoom.out).not.toHaveBeenCalled();
+    component.swiper = null;
+  });
+
 });

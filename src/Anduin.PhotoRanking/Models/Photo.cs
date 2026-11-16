@@ -139,4 +139,11 @@ public class Photo
     public long? FeedRank { get; set; }
 
     public DateTime LastModified { get; set; } = DateTime.UtcNow;
+
+    // Only the summary API may expose these fields, after checking prompt freshness.
+    [JsonIgnore]
+    public string? Summary { get; set; }
+
+    [JsonIgnore]
+    public DateTime? SummaryGeneratedAt { get; set; }
 }

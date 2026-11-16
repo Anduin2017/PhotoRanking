@@ -38,6 +38,7 @@ public class TestStartup : IWebStartup
         services.AddScoped<PersonalizedPredictionService>();
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
+        services.AddScoped<PhotoSummaryService>();
 
         // Controllers and localization
         services.AddControllersWithViews()
