@@ -128,6 +128,14 @@ public class PhotoSpeechTests
         var job = (SpeechJob)submitted.Value!;
         Assert.AreEqual("queued", job.Status);
         Assert.AreEqual(2, job.QueuePosition);
+        var wire = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(job,
+            new Newtonsoft.Json.JsonSerializerSettings
+            {
+                ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
+            }));
+        Assert.AreEqual(2, (int)wire["queue_position"]!);
+        Assert.AreEqual(1, (int)wire["completed_segments"]!);
+        Assert.AreEqual(3, (int)wire["total_segments"]!);
         Assert.AreEqual(1, _gateway.Calls);
         _gateway.JobStatus = "running";
         var result = (SpeechJob)((OkObjectResult)await _controller.GetSpeechJob(1, job.Id, request, CancellationToken.None)).Value!;
