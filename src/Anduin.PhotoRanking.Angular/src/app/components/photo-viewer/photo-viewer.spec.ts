@@ -256,6 +256,22 @@ describe('Summary narration', () => {
     expect(component.speechState).toBe('idle');
   });
 
+  it('stops narration when polling invalidates the final answer', async () => {
+    component.autoReadSummary = true;component.toggleSummarySpeech();await Promise.resolve();
+    vi.spyOn(TestBed.inject(PhotoService), 'getSummary').mockReturnValue(of({ summary: null }));
+    component.refreshSummary();
+    expect(component.speechState).toBe('idle');expect(component.summaryResponses).toEqual([]);
+    expect(audio.pause).toHaveBeenCalled();expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it('does not resume an old play promise after playback is disabled', async () => {
+    let finish!: () => void;
+    audio.play.mockReturnValueOnce(new Promise<void>(resolve => finish = resolve));
+    component.autoReadSummary = true;component.toggleSummarySpeech();
+    component.autoReadSummary = false;component.toggleSummarySpeech();
+    finish();await Promise.resolve();expect(component.speechState).toBe('idle');
+  });
+
   it('offers generation retry and stops on manual earlier rounds and closing', async () => {
     speech.mockReturnValueOnce(throwError(() => ({ status: 503 })));
     component.autoReadSummary = true;component.toggleSummarySpeech();
