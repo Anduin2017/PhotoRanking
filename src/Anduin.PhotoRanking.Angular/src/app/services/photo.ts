@@ -62,6 +62,7 @@ export interface SummarySettings {
   configured?: boolean;
   targetCount?: number;
   completedCount?: number;
+  examples?: Photo[];
 }
 
 export interface GlobalStats {

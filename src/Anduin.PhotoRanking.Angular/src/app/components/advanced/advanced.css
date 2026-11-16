@@ -233,3 +233,6 @@
 .summary-settings .summary-hint { font-size: 0.9rem; }
 .summary-range { margin-top: 1.5rem; }
 .summary-range input { width: 100%; accent-color: var(--primary); }
+
+.summary-range progress { width: 100%; accent-color: var(--primary); }
+.summary-examples { margin-top: 1.5rem; }

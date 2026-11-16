@@ -1,6 +1,8 @@
 using System.Net;
 using Aiursoft.DbTools;
 using Anduin.PhotoRanking.Data;
+using Anduin.PhotoRanking.Models;
+using Newtonsoft.Json.Linq;
 using static Aiursoft.WebTools.Extends;
 
 [assembly:DoNotParallelize]
@@ -121,7 +123,7 @@ public class BasicTests
     {
         var response = await _http.GetAsync("/api/summary/settings");
         response.EnsureSuccessStatusCode();
-        var settings = Newtonsoft.Json.Linq.JObject.Parse(await response.Content.ReadAsStringAsync());
+        var settings = JObject.Parse(await response.Content.ReadAsStringAsync());
         Assert.AreEqual(3d, (double)settings["topPercent"]!);
         Assert.IsNull(settings["apiKey"]);
         Assert.IsFalse((bool)settings["configured"]!);
@@ -137,6 +139,37 @@ public class BasicTests
         valid.EnsureSuccessStatusCode();
         var missing = await _http.GetAsync("/api/summary/photos/12345");
         Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task RecentSummaryExamplesIncludeRetainedPhotosAndDisappearWhenPromptsChange()
+    {
+        using var scope = _server!.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Albums.Add(new Album { AlbumId = "examples", Name = "Examples" });
+        db.Photos.Add(new Photo
+        {
+            AlbumId = "examples", FilePath = "example.jpg", IndependentScore = 6,
+            Summary = "A synthetic poem", SummaryGeneratedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        var settings = JObject.Parse(await _http.GetStringAsync("/api/summary/settings"));
+        var examples = (JArray)settings["examples"]!;
+        Assert.HasCount(1, examples);
+        Assert.AreEqual("example.jpg", (string?)examples[0]["filePath"]);
+        Assert.IsNull(examples[0]["summary"]);
+        Assert.IsNull(examples[0]["featureVector"]);
+        var body = new { prompt1 = (string)settings["prompt1"]!, prompt2 = (string)settings["prompt2"]!,
+            prompt3 = (string)settings["prompt3"]!, topPercent = 0 };
+        var paused = await _http.PutAsJsonAsync("/api/summary/settings", body);
+        paused.EnsureSuccessStatusCode();
+        Assert.HasCount(1, (JArray)JObject.Parse(await paused.Content.ReadAsStringAsync())["examples"]!);
+        var changed = await _http.PutAsJsonAsync("/api/summary/settings", new
+        {
+            body.prompt1, body.prompt2, prompt3 = "New poem", body.topPercent
+        });
+        changed.EnsureSuccessStatusCode();
+        Assert.IsEmpty((JArray)JObject.Parse(await changed.Content.ReadAsStringAsync())["examples"]!);
     }
 
 }

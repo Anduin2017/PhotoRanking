@@ -120,13 +120,30 @@ Configure the server's existing `/data/appsettings.json` (or environment variabl
 ```json
 "Summary": {
   "Endpoint": "https://ollama.aiursoft.com/api/chat",
-  "Model": "aiursoft-thinking:latest",
+  "Model": "aiursoft-localization:latest",
   "ApiKey": "YOUR_DEDICATED_GATEWAY_KEY"
 }
 ```
 
 The equivalent environment keys are `Summary__Endpoint`, `Summary__Model`, and
-`Summary__ApiKey`. Generation waits until an API key is configured. Credentials are
+`Summary__ApiKey`. Environment variables override `appsettings.json`; recreate the
+container after changing its environment. `Endpoint` is the complete Ollama chat URL
+(including `/api/chat`), `Model` is the gateway model name, and `ApiKey` is sent as a
+Bearer token. For example:
+
+```yaml
+environment:
+  Summary__Endpoint: https://ollama.aiursoft.com/api/chat
+  Summary__Model: aiursoft-localization:latest
+  Summary__ApiKey: ${PHOTORANKING_AI_TOKEN}
+```
+
+Keep the token in the deployment's private environment file, outside Git. An `.env`
+file keeps secrets separate from source control; it does not encrypt them. Generation
+waits until all three settings are valid. Advanced settings refresh progress and up
+to six recent, current summary examples every ten seconds. Click an example to open
+the photo and read its summary. Prompt edits also immediately hide stale examples.
+Credentials are
 never returned by the settings API. PhotoRanking remains a private library behind
 its existing login proxy; these settings apply to that library. Generation sends a
 JPEG preview (at most 1536 pixels on the longest side, without source metadata) to

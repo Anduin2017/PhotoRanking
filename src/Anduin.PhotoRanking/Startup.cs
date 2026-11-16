@@ -2,6 +2,7 @@ using Aiursoft.DbTools.Sqlite;
 using Aiursoft.WebTools.Abstractions.Models;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
+using Anduin.PhotoRanking.Models;
 using Aiursoft.Canon;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.Extensions.FileProviders;
@@ -39,6 +40,7 @@ public class Startup : IWebStartup
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
         services.AddScoped<DedupService>();
+        services.Configure<SummaryOptions>(configuration.GetSection(SummaryOptions.SectionName));
         services.AddScoped<PhotoSummaryService>();
 
         services.AddHostedService<PredictorBackgroundService>();

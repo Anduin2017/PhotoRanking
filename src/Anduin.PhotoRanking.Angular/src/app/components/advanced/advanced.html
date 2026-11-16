@@ -16,10 +16,21 @@
                 <input id="summary-top-percent" name="topPercent" type="range" min="0" max="100" step="1"
                     [(ngModel)]="settings.topPercent" (change)="saveSummaryPercent()" [disabled]="savingSummary">
                 <p class="summary-hint">按人工分优先、否则使用预测分排名。0% 暂停新增生成。</p>
+                <progress aria-label="摘要生成进度" [value]="settings.completedCount ?? 0" [max]="settings.targetCount || 1"></progress>
                 <p role="status">当前范围已完成 {{ settings.completedCount ?? 0 }} / {{ settings.targetCount ?? 0 }} 张</p>
             </div>
             <p *ngIf="!settings.configured" class="summary-hint">尚未配置摘要模型连接，请联系管理员配置后开始生成。</p>
         </form>
+        <div *ngIf="summarySettings?.examples?.length" class="summary-examples">
+            <h3>最近生成的摘要</h3>
+            <p class="summary-hint">点击照片查看完整摘要。缩小范围后，已有摘要仍保留。</p>
+            <div class="photo-grid">
+                <button type="button" class="photo-grid-item" *ngFor="let photo of summarySettings?.examples"
+                    (click)="openViewer(photo.id, summarySettings?.examples ?? [])" [attr.aria-label]="'查看摘要：' + photo.filePath">
+                    <img [src]="photoService.getImageUrl(photo.filePath)" [alt]="photo.filePath" loading="lazy">
+                </button>
+            </div>
+        </div>
         <p *ngIf="summaryMessage" role="status">{{ summaryMessage }}</p>
         <p *ngIf="summaryError" role="alert">{{ summaryError }}</p>
     </section>
