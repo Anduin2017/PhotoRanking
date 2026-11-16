@@ -128,6 +128,15 @@ the text and use the keyboard to read at your own pace. Automatic scrolling paus
 after interaction and respects reduced-motion preferences. The bottom-bar **显示图片摘要**
 checkbox is enabled by default; photos without a current summary show **此图片尚未摘要**.
 
+The bottom-bar **自动播放** checkbox is off by default. Enable it to generate and
+read the current third-round answer once per photo. It stays on the third round
+until narration ends, then resumes the text cycle. Selecting an earlier round,
+changing photos, closing the viewer or disabling playback stops the audio. If the
+browser blocks playback, use **点击播放**; failed requests offer **重试语音**.
+Speech is generated only on demand, through the authenticated PhotoRanking API;
+existing IndexTTS caching avoids repeating identical synthesis. Changed or expired
+summaries are rejected before and after generation.
+
 Configure the server's existing `/data/appsettings.json` (or environment variables):
 
 ```json
@@ -162,6 +171,26 @@ its existing login proxy; these settings apply to that library. Generation sends
 JPEG preview (at most 1536 pixels on the longest side, without source metadata) to
 the configured model endpoint. Keep the server behind authenticated access as for
 the existing photo and rating APIs.
+
+Speech uses the native IndexTTS form endpoint so inference does not block its
+health checks. Configure these server settings; the key is never sent to the browser:
+
+```json
+"Tts": {
+  "Endpoint": "https://tts.aiursoft.com/api/tts",
+  "Model": "broadcasting",
+  "Voice": "",
+  "ApiKey": "YOUR_TTS_KEY"
+}
+```
+
+Use `Tts__Endpoint`, `Tts__Model`, `Tts__Voice` and `Tts__ApiKey` for environment
+overrides. For this single-engine service, `Model` names the voice profile used by
+Yuefu's reader (`broadcasting`); optional `Voice` overrides that profile. The native
+request sends `voice` and the stored third-round text, and receives WAV audio.
+Keep `ApiKey` in the deployment's private `.env.prod`; missing configuration leaves
+text summaries available and reports speech as unavailable when requested. There
+is no audio database migration or new background generation job.
 
 ## How to contribute
 

@@ -123,6 +123,10 @@ export class PhotoService {
     });
   }
 
+  getSummarySpeech(photoId: number, summary: string): Observable<Blob> {
+    return this.http.post(`/api/summary/photos/${photoId}/speech`, { summary }, { responseType: 'blob' });
+  }
+
   getSummary(photoId: number): Observable<SummaryResponses> {
     return this.http.get<SummaryResponses>(`${this.apiBase}/summary/photos/${photoId}`);
   }
