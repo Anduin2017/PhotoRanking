@@ -2,6 +2,7 @@ using Aiursoft.DbTools.Sqlite;
 using Aiursoft.WebTools.Abstractions.Models;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Services;
+using Anduin.PhotoRanking.Models;
 using Aiursoft.Canon;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Newtonsoft.Json;
@@ -38,6 +39,7 @@ public class TestStartup : IWebStartup
         services.AddScoped<PersonalizedPredictionService>();
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
+        services.Configure<SummaryOptions>(configuration.GetSection(SummaryOptions.SectionName));
         services.AddScoped<PhotoSummaryService>();
 
         // Controllers and localization

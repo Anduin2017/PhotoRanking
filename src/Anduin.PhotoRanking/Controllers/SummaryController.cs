@@ -3,6 +3,7 @@ using Anduin.PhotoRanking.Models;
 using Anduin.PhotoRanking.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using EFCoreSecondLevelCacheInterceptor;
 
 namespace Anduin.PhotoRanking.Controllers;
 
@@ -17,6 +18,11 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
     {
         var state = await service.GetSettingsAsync(ct);
         var target = await service.GetTargetPhotosAsync(state, ct);
+        var examples = await context.Photos.AsNoTracking().NotCacheable()
+            .Where(p => p.Summary != null && p.SummaryGeneratedAt != null &&
+                p.SummaryGeneratedAt >= state.SummaryPromptsModifiedAt)
+            .OrderByDescending(p => p.SummaryGeneratedAt).ThenBy(p => p.Id)
+            .Take(6).ToListAsync(ct);
         return Ok(new
         {
             prompt1 = state.SummaryPrompt1,
@@ -25,6 +31,7 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
             topPercent = state.SummaryTopPercent,
             promptsModifiedAt = state.SummaryPromptsModifiedAt,
             configured = service.IsConfigured,
+            examples,
             targetCount = await target.CountAsync(ct),
             completedCount = await target.CountAsync(p => p.Summary != null && p.SummaryGeneratedAt != null &&
                 p.SummaryGeneratedAt >= state.SummaryPromptsModifiedAt, ct)

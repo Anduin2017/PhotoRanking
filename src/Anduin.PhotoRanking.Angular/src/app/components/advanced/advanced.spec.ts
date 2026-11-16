@@ -34,6 +34,20 @@ describe('AdvancedComponent', () => {
     expect(component.savedSummarySettings?.prompt3).toBe('three');
   });
 
+  it('shows summary progress and opens a completed example in the viewer', () => {
+    const photo = { id: 42, filePath: 'example.jpg', albumId: 'test', viewCount: 0, createdAt: '' };
+    component.summarySettings = { prompt1: 'one', prompt2: 'two', prompt3: 'three', topPercent: 3,
+      configured: true, completedCount: 1, targetCount: 3, examples: [photo] };
+    fixture.detectChanges();
+    const progress = fixture.nativeElement.querySelector('progress') as HTMLProgressElement;
+    expect(progress.value).toBe(1);
+    expect(progress.max).toBe(3);
+    fixture.nativeElement.querySelector('.summary-examples button').click();
+    expect(component.viewerOpen).toBe(true);
+    expect(component.initialPhotoId).toBe(42);
+    expect(component.viewerPhotos).toEqual([photo]);
+  });
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });

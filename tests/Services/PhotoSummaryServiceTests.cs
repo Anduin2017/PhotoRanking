@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Options;
 using System.Text;
 using Aiursoft.DbTools.Sqlite;
 using Anduin.PhotoRanking.Data;
@@ -43,7 +44,7 @@ public class PhotoSummaryServiceTests
             ["Summary:Endpoint"] = "http://model.test/api/chat",
             ["PhotoRootPath"] = _directory
         }).Build();
-        _service = new PhotoSummaryService(_context, _model, configuration, NullLogger<PhotoSummaryService>.Instance);
+        _service = new PhotoSummaryService(_context, _model, configuration, Options.Create(configuration.GetSection("Summary").Get<SummaryOptions>()!), NullLogger<PhotoSummaryService>.Instance);
         await Save(10);
     }
 
@@ -191,7 +192,7 @@ public class PhotoSummaryServiceTests
             ["PhotoRootPath"] = _directory, ["Summary:ApiKey"] = "synthetic-cache-test-key",
             ["Summary:Endpoint"] = "http://model.test/api/chat"
         }).Build();
-        var service = new PhotoSummaryService(db, _model, config, NullLogger<PhotoSummaryService>.Instance);
+        var service = new PhotoSummaryService(db, _model, config, Options.Create(config.GetSection("Summary").Get<SummaryOptions>()!), NullLogger<PhotoSummaryService>.Instance);
         await service.SaveSettingsAsync(new SummarySettings
         {
             Prompt1 = "one", Prompt2 = "two", Prompt3 = "three", TopPercent = 100
@@ -211,9 +212,57 @@ public class PhotoSummaryServiceTests
         Assert.HasCount(6, _model.Requests);
     }
 
+    [TestMethod]
+    public async Task EnvironmentOverridesJsonForAllThreeSettingsAndDrivesRealRequests()
+    {
+        var prefix = "PHOTO_TEST_" + Guid.NewGuid().ToString("N") + "_";
+        var values = new Dictionary<string, string>
+        {
+            ["Summary__Endpoint"] = "https://env-model.test/custom/api/chat",
+            ["Summary__Model"] = "custom-vision-model",
+            ["Summary__ApiKey"] = "synthetic-env-token"
+        };
+        try
+        {
+            foreach (var pair in values) Environment.SetEnvironmentVariable(prefix + pair.Key, pair.Value);
+            using var json = new MemoryStream(Encoding.UTF8.GetBytes(
+                """{"Summary":{"Endpoint":"https://json-model.test/api/chat","Model":"json-model","ApiKey":"json-key"}}"""));
+            var configuration = new ConfigurationBuilder().AddJsonStream(json)
+                .AddEnvironmentVariables(prefix).AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["PhotoRootPath"] = _directory
+                }).Build();
+            var options = configuration.GetSection(SummaryOptions.SectionName).Get<SummaryOptions>()!;
+            var service = new PhotoSummaryService(_context, _model, configuration, Options.Create(options),
+                NullLogger<PhotoSummaryService>.Instance);
+            _model.ExpectedModel = "custom-vision-model";
+            await service.RunOnceAsync(CancellationToken.None);
+            Assert.IsTrue(service.IsConfigured);
+            Assert.HasCount(3, _model.Requests);
+            Assert.AreEqual(values["Summary__Endpoint"], _model.LastEndpoint);
+            Assert.AreEqual(values["Summary__ApiKey"], _model.LastToken);
+            Assert.IsNotNull(await service.GetSummaryAsync(1, CancellationToken.None));
+        }
+        finally
+        {
+            foreach (var key in values.Keys) Environment.SetEnvironmentVariable(prefix + key, null);
+        }
+    }
+
+    [TestMethod]
+    public void MissingOrInvalidConnectionSettingsKeepGenerationIdle()
+    {
+        Assert.IsFalse(new SummaryOptions().IsConfigured);
+        Assert.IsFalse(new SummaryOptions { ApiKey = "test", Model = " " }.IsConfigured);
+        Assert.IsFalse(new SummaryOptions { ApiKey = "test", Endpoint = "file:///tmp/model" }.IsConfigured);
+    }
+
     private class RecordingModel : HttpMessageHandler, IHttpClientFactory
     {
         public List<JObject> Requests { get; } = [];
+        public string ExpectedModel { get; set; } = "aiursoft-localization:latest";
+        public string? LastEndpoint { get; private set; }
+        public string? LastToken { get; private set; }
         public Func<int, Task>? OnRequest { get; set; }
         public bool FailFirst { get; set; }
         public bool CompleteAnswer { get; set; } = true;
@@ -224,7 +273,9 @@ public class PhotoSummaryServiceTests
             var body = JObject.Parse(await request.Content!.ReadAsStringAsync(ct));
             Requests.Add(body);
             Assert.AreEqual("Bearer", request.Headers.Authorization?.Scheme);
-            Assert.AreEqual("aiursoft-thinking:latest", body["model"]!.Value<string>());
+            Assert.AreEqual(ExpectedModel, body["model"]!.Value<string>());
+            LastEndpoint = request.RequestUri?.AbsoluteUri;
+            LastToken = request.Headers.Authorization?.Parameter;
             if (OnRequest != null) await OnRequest(Requests.Count);
             if (FailFirst && Requests.Count == 1) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
             return new HttpResponseMessage(HttpStatusCode.OK)

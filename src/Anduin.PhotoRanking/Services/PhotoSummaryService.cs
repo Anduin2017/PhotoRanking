@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Options;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
 using Microsoft.EntityFrameworkCore;
@@ -12,9 +13,10 @@ public class PhotoSummaryService(
     AppDbContext context,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
+    IOptions<SummaryOptions> options,
     ILogger<PhotoSummaryService> logger)
 {
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(configuration["Summary:ApiKey"]);
+    public bool IsConfigured => options.Value.IsConfigured;
 
     public async Task<SystemState> GetSettingsAsync(CancellationToken ct)
     {
@@ -136,7 +138,7 @@ public class PhotoSummaryService(
 
         using var client = httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromMinutes(5);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["Summary:ApiKey"]);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.ApiKey);
         var messages = new List<object>();
         var prompts = new[] { settings.SummaryPrompt1, settings.SummaryPrompt2, settings.SummaryPrompt3 };
         string? answer = null;
@@ -147,8 +149,8 @@ public class PhotoSummaryService(
                 ? new { role = "user", content = prompts[i], images = new[] { base64 } }
                 : new { role = "user", content = prompts[i] });
             using var response = await client.PostAsJsonAsync(
-                configuration["Summary:Endpoint"] ?? "https://ollama.aiursoft.com/api/chat",
-                new { model = configuration["Summary:Model"] ?? "aiursoft-thinking:latest", stream = false, messages }, ct);
+                options.Value.Endpoint,
+                new { model = options.Value.Model, stream = false, messages }, ct);
             response.EnsureSuccessStatusCode();
             var body = JObject.Parse(await response.Content.ReadAsStringAsync(ct));
             answer = body["message"]?["content"]?.Value<string>();
