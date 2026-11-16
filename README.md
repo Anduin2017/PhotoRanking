@@ -89,8 +89,9 @@ The model contract, upgrade invariants, and current retrospective evaluation are
 
 In **Advanced**, edit three prompts and save them. The background worker sends the
 photo with the first prompt, then carries the image and all previous questions and
-answers into the next two rounds. Only the final answer is stored as the photo's
-summary. For example, use the first two prompts to describe and interpret a photo,
+answers into the next two rounds. All three answers are stored together, with the
+third answer retained as the photo's final summary for compatibility. For example,
+use the first two prompts to describe and interpret a photo,
 then ask the third prompt to write a poem.
 
 The coverage slider defaults to the top 3% of the whole library, ranked by
@@ -108,6 +109,18 @@ timestamps determine freshness; a final atomic check prevents a response using o
 prompts from being published after an edit. Saving identical prompts or changing
 only coverage does not invalidate summaries. A useful workflow is to tune prompts
 at 1%, then increase coverage to 40% once satisfied.
+
+The viewer plays the saved answers in reverse order: third, second, first, then
+repeats. Each answer starts scrolling after two seconds at one rendered line every
+two seconds, scrolls to its end and remains there for four seconds before
+the next one starts. Use the round buttons to select an answer directly; reduced
+motion disables automatic playback while keeping these buttons available. Unchanged
+background refreshes preserve the current answer and reading position.
+
+Existing photos with only a final answer remain viewable. The background worker
+regenerates their full three-answer conversation within the current coverage range,
+then atomically replaces all three answers. Shrinking coverage still keeps existing
+answers outside the target. Progress counts photos with all three current answers.
 
 The viewer displays summaries as gently scrolling text beside the photo, with three
 clear lines and four fading lines. Drag vertically, use the mouse wheel, or focus

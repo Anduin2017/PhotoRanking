@@ -34,10 +34,13 @@ describe('PhotoViewerComponent', () => {
     })
     .compileComponents();
 
+    Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn().mockReturnValue({ matches: false }) });
     fixture = TestBed.createComponent(PhotoViewerComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -99,6 +102,87 @@ describe('PhotoViewerComponent', () => {
     component.onWheel(event);
     expect(zoom.out).not.toHaveBeenCalled();
     component.swiper = null;
+  });
+
+  it('plays all saved answers in 3-2-1 order and loops only after the end hold', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    vi.spyOn(photoServiceMock, 'getSummary').mockReturnValue(of({ summary: 'third', response2: 'second', response1: 'first' }));
+    component.updateOverlay(1);
+    fixture.detectChanges();
+    const scroller = component.summaryScroller!.nativeElement;
+    Object.defineProperty(scroller, 'clientHeight', { value: 100 });
+    Object.defineProperty(scroller, 'scrollHeight', { value: 100 });
+    expect(component.summaryResponses.map(x => x.round)).toEqual([3, 2, 1]);
+    expect(component.summary).toBe('third');
+    for (const [start, end, text] of [[2000, 6000, 'second'], [8000, 12000, 'first'], [14000, 18000, 'third']] as const) {
+      clock.mockReturnValue(start); component.scrollSummary();
+      clock.mockReturnValue(end - 1); component.scrollSummary();
+      expect(component.summary).not.toBe(text);
+      clock.mockReturnValue(end); component.scrollSummary();
+      expect(component.summary).toBe(text);
+    }
+  });
+
+  it('starts untouched summaries after two seconds and scrolls one actual line every two seconds', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    vi.spyOn(photoServiceMock, 'getSummary').mockReturnValue(of({ summary: 'long poem' }));
+    component.updateOverlay(1);
+    fixture.detectChanges();
+    const scroller = component.summaryScroller!.nativeElement;
+    scroller.style.lineHeight = '37px';
+    Object.defineProperty(scroller, 'clientHeight', { value: 100 });
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1000 });
+    clock.mockReturnValue(1999); component.scrollSummary();
+    expect(scroller.scrollTop).toBe(0);
+    for (let time = 2000; time <= 4000; time += 100) {
+      clock.mockReturnValue(time); component.scrollSummary();
+    }
+    expect(scroller.scrollTop).toBeCloseTo(37, 0);
+    component.pauseSummaryScroll(new Event('wheel'));
+    clock.mockReturnValue(13000); component.scrollSummary();
+    expect(scroller.scrollTop).toBeCloseTo(37, 0);
+    clock.mockReturnValue(14000); component.scrollSummary();
+    expect(scroller.scrollTop).toBeCloseTo(37, 0);
+  });
+
+  it('keeps the current answer and scroll position when polling unchanged responses', () => {
+    vi.spyOn(photoServiceMock, 'getSummary').mockReturnValue(of({ summary: 'third', response2: 'second', response1: 'first' }));
+    component.updateOverlay(1);
+    component.selectSummaryResponse(1);
+    fixture.detectChanges();
+    component.summaryScroller!.nativeElement.scrollTop = 42;
+    component.refreshSummary();
+    expect(component.summary).toBe('second');
+    expect(component.summaryIndex).toBe(1);
+    expect(component.summaryScroller!.nativeElement.scrollTop).toBe(42);
+  });
+
+  it('supports legacy final-only answers and clears every round on invalidation', () => {
+    const request = vi.spyOn(photoServiceMock, 'getSummary').mockReturnValue(of({ summary: 'legacy poem' }));
+    component.updateOverlay(1);
+    expect(component.summaryResponses).toEqual([{ round: 3, text: 'legacy poem' }]);
+    request.mockReturnValue(of({ summary: null }));
+    component.refreshSummary();
+    expect(component.summary).toBeNull();
+    expect(component.summaryResponses).toEqual([]);
+  });
+
+  it('keeps manual round selection available with reduced motion and pauses after interaction', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    vi.spyOn(photoServiceMock, 'getSummary').mockReturnValue(of({ summary: 'third', response2: 'second', response1: 'first' }));
+    component.updateOverlay(1);
+    fixture.detectChanges();
+    const buttons = fixture.nativeElement.querySelectorAll('.summary-rounds button');
+    expect([...buttons].map((b: any) => b.textContent.trim())).toEqual(['第3轮', '第2轮', '第1轮']);
+    buttons[1].click();
+    expect(component.summary).toBe('second');
+    component.pauseSummaryScroll(new Event('wheel'));
+    clock.mockReturnValue(9000); component.scrollSummary();
+    expect(component.summary).toBe('second');
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+    clock.mockReturnValue(30000); component.scrollSummary();
+    expect(component.summary).toBe('second');
+    buttons[2].click(); expect(component.summary).toBe('first');
   });
 
 });

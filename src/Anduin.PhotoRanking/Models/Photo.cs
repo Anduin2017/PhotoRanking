@@ -145,5 +145,11 @@ public class Photo
     public string? Summary { get; set; }
 
     [JsonIgnore]
+    public string? SummaryResponse1 { get; set; }
+
+    [JsonIgnore]
+    public string? SummaryResponse2 { get; set; }
+
+    [JsonIgnore]
     public DateTime? SummaryGeneratedAt { get; set; }
 }

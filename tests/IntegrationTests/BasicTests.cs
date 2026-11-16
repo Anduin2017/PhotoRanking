@@ -150,7 +150,8 @@ public class BasicTests
         db.Photos.Add(new Photo
         {
             AlbumId = "examples", FilePath = "example.jpg", IndependentScore = 6,
-            Summary = "A synthetic poem", SummaryGeneratedAt = DateTime.UtcNow
+            Summary = "A synthetic poem", SummaryResponse1 = "Observed image",
+            SummaryResponse2 = "Interpreted image", SummaryGeneratedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
         var settings = JObject.Parse(await _http.GetStringAsync("/api/summary/settings"));
@@ -159,6 +160,14 @@ public class BasicTests
         Assert.AreEqual("example.jpg", (string?)examples[0]["filePath"]);
         Assert.IsNull(examples[0]["summary"]);
         Assert.IsNull(examples[0]["featureVector"]);
+        Assert.IsNull(examples[0]["summaryResponse1"]);
+        Assert.IsNull(examples[0]["summaryResponse2"]);
+        Assert.AreEqual(1, (int)settings["completedCount"]!);
+        var id = (int)examples[0]["id"]!;
+        var responses = JObject.Parse(await _http.GetStringAsync($"/api/summary/photos/{id}"));
+        Assert.AreEqual("A synthetic poem", (string?)responses["summary"]);
+        Assert.AreEqual("Observed image", (string?)responses["response1"]);
+        Assert.AreEqual("Interpreted image", (string?)responses["response2"]);
         var body = new { prompt1 = (string)settings["prompt1"]!, prompt2 = (string)settings["prompt2"]!,
             prompt3 = (string)settings["prompt3"]!, topPercent = 0 };
         var paused = await _http.PutAsJsonAsync("/api/summary/settings", body);
@@ -170,6 +179,8 @@ public class BasicTests
         });
         changed.EnsureSuccessStatusCode();
         Assert.IsEmpty((JArray)JObject.Parse(await changed.Content.ReadAsStringAsync())["examples"]!);
+        responses = JObject.Parse(await _http.GetStringAsync($"/api/summary/photos/{id}"));
+        Assert.IsTrue(responses.Properties().All(p => p.Value.Type == JTokenType.Null));
     }
 
 }

@@ -28,6 +28,11 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   showSummary = true;
   summary: string | null = null;
+  summaryResponses: { round: number; text: string }[] = [];
+  summaryIndex = 0;
+  private summaryLastScrollAt: number | null = null;
+  private summaryScrollRemainder = 0;
+  private summaryBottomSince: number | null = null;
   private destroyed = false;
   private activePhotoId: number | null = null;
   private summaryRefreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -55,15 +60,49 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   ngOnInit() {
     this.summaryRefreshTimer = setInterval(() => this.refreshSummary(), 10000);
-    this.summaryScrollTimer = setInterval(() => {
-      const element = this.summaryScroller?.nativeElement;
-      if (!element || !this.showSummary || !this.summary || document.hidden ||
-          Date.now() < this.summaryPauseUntil || this.summaryPointer ||
-          window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      if (element.scrollTop + element.clientHeight < element.scrollHeight - 1) {
-        element.scrollTop += 1;
+    this.summaryScrollTimer = setInterval(() => this.scrollSummary(), 100);
+  }
+
+  scrollSummary() {
+    const element = this.summaryScroller?.nativeElement;
+    if (!element || !this.showSummary || !this.summary || document.hidden ||
+        Date.now() < this.summaryPauseUntil || this.summaryPointer ||
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      this.summaryBottomSince = null;
+      this.summaryLastScrollAt = null;
+      this.summaryScrollRemainder = 0;
+      return;
+    }
+    const now = Date.now();
+    const elapsed = now - (this.summaryLastScrollAt ?? now);
+    this.summaryLastScrollAt = now;
+    if (element.scrollTop + element.clientHeight < element.scrollHeight - 1) {
+      const style = window.getComputedStyle(element);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.9;
+      const distance = this.summaryScrollRemainder + lineHeight * elapsed / 2000;
+      const pixels = Math.floor(distance);
+      element.scrollTop += pixels;
+      this.summaryScrollRemainder = distance - pixels;
+      this.summaryBottomSince = null;
+    } else if (this.summaryResponses.length > 1) {
+      this.summaryBottomSince ??= Date.now();
+      if (Date.now() - this.summaryBottomSince >= 4000) {
+        this.selectSummaryResponse((this.summaryIndex + 1) % this.summaryResponses.length);
       }
-    }, 100);
+    }
+  }
+
+  selectSummaryResponse(index: number) {
+    const response = this.summaryResponses[index];
+    if (!response) return;
+    this.summaryIndex = index;
+    this.summary = response.text;
+    this.summaryBottomSince = null;
+    this.summaryLastScrollAt = null;
+    this.summaryScrollRemainder = 0;
+    this.summaryPauseUntil = Date.now() + 2000;
+    this.cdr.detectChanges();
+    if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -152,7 +191,12 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
     this.activePhotoId = photoId;
     this.summary = null;
-    this.summaryPauseUntil = Date.now() + 3000;
+    this.summaryResponses = [];
+    this.summaryIndex = 0;
+    this.summaryBottomSince = null;
+    this.summaryLastScrollAt = null;
+    this.summaryScrollRemainder = 0;
+    this.summaryPauseUntil = Date.now() + 2000;
     if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
     this.refreshSummary();
     this.guessedScore = null;
@@ -173,10 +217,17 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.photoService.getSummary(id).subscribe({
       next: result => {
         if (this.destroyed || this.activePhotoId !== id) return;
-        if (this.summary !== result.summary) {
-          this.summary = result.summary;
-          if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
-          this.summaryPauseUntil = Date.now() + 3000;
+        const responses = [
+          { round: 3, text: result.summary }, { round: 2, text: result.response2 },
+          { round: 1, text: result.response1 }
+        ].filter((response): response is { round: number; text: string } => !!response.text?.trim());
+        // Polling unchanged responses must not restart playback at round three.
+        if (JSON.stringify(this.summaryResponses) !== JSON.stringify(responses)) {
+          this.summaryResponses = responses;
+          this.summaryIndex = 0;
+          this.summary = null;
+          this.summaryBottomSince = null;
+          if (responses.length) this.selectSummaryResponse(0);
         }
         this.cdr.detectChanges();
       },
@@ -187,6 +238,10 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   }
 
   toggleSummary() {
+    this.summaryBottomSince = null;
+    this.summaryLastScrollAt = null;
+    this.summaryScrollRemainder = 0;
+    this.summaryPauseUntil = Date.now() + 2000;
     if (this.showSummary) this.refreshSummary();
   }
 
@@ -211,6 +266,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   pauseSummaryScroll(event: Event) {
     event.stopPropagation();
+    this.summaryBottomSince = null;
     this.summaryPauseUntil = Date.now() + 10000;
   }
 

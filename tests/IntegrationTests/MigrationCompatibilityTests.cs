@@ -94,4 +94,28 @@ public class MigrationCompatibilityTests
         CollectionAssert.Contains(indexNames, "IX_Photos_PredictionUncertainty");
         CollectionAssert.Contains(indexNames, "IX_Photos_PredictionNovelty");
     }
+    [TestMethod]
+    public async Task SummaryResponsesMigrationPreservesExistingFinalPoems()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        await using var context = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261116095620_PhotoSummaries");
+        await context.Database.ExecuteSqlRawAsync("""
+            INSERT INTO Albums (AlbumId,Name,AlbumScore,KnownRate,StandardDeviation,PhotoCount,CreatedAt,UpdatedAt,RatedPhotoCount)
+            VALUES ('legacy','Legacy',0,0,0,1,'2026-01-01','2026-01-01',0);
+            INSERT INTO Photos (Id,FilePath,IndependentScore,OverallScore,Knownness,RatingCount,IsFixed,ViewCount,CreatedAt,
+                AlbumId,FileSize,LastModified,Summary,SummaryGeneratedAt)
+            VALUES (1,'legacy.jpg',6,0,0,0,0,0,'2026-01-01','legacy',123,'2026-01-01','Keep this final poem','2026-11-16 11:00:00');
+            """);
+        await migrator.MigrateAsync();
+        var photo = await context.Photos.SingleAsync();
+        Assert.AreEqual("Keep this final poem", photo.Summary);
+        Assert.IsNotNull(photo.SummaryGeneratedAt);
+        Assert.IsNull(photo.SummaryResponse1);
+        Assert.IsNull(photo.SummaryResponse2);
+        Assert.AreEqual(6d, photo.IndependentScore);
+    }
+
 }
