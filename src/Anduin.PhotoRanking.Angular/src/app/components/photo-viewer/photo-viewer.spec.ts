@@ -237,6 +237,22 @@ describe('Summary narration', () => {
     clock.mockReturnValue(24000);component.scrollSummary();expect(component.summaryIndex).toBe(1);
   });
 
+  it('shows queue position and segment progress without starting audio early', async () => {
+    const pending = new Subject<any>();speech.mockReturnValue(pending);
+    component.autoReadSummary = true;component.toggleSummarySpeech();
+    pending.next({ status: 'queued', queue_position: 4 });
+    expect(component.speechMessage).toBe('语音排队中，第4位');expect(audio.play).not.toHaveBeenCalled();
+    pending.next({ status: 'running', completed_segments: 2, total_segments: 5 });
+    expect(component.speechMessage).toBe('正在合成语音，2/5段');expect(component.speechState).toBe('loading');
+    pending.next(new Blob(['audio']));await Promise.resolve();expect(component.speechState).toBe('playing');
+  });
+
+  it('explains queue capacity failures without retrying automatically', () => {
+    speech.mockReturnValue(throwError(() => ({ status: 429 })));
+    component.autoReadSummary = true;component.toggleSummarySpeech();
+    expect(component.speechMessage).toBe('语音队列已满，请稍后重试');expect(speech).toHaveBeenCalledTimes(1);
+  });
+
   it('offers click-to-play when blocked without synthesizing again', async () => {
     audio.play.mockRejectedValueOnce(new DOMException('Blocked', 'NotAllowedError'));
     component.autoReadSummary = true;component.toggleSummarySpeech();await Promise.resolve();

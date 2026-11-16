@@ -48,18 +48,18 @@ public class PhotoSpeechTests
         => _controller.GetSpeech(id, new SummarySpeechRequest { Summary = text }, CancellationToken.None);
 
     [TestMethod]
-    public async Task CurrentFinalAnswerUsesNativeFormAndReturnsAudioWithoutCredentials()
+    public async Task CurrentFinalAnswerUsesQueuedGatewayAndReturnsAudioWithoutCredentials()
     {
         var result = (FileContentResult)await Speak();
         Assert.AreEqual("audio/wav", result.ContentType);
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, result.FileContents);
         Assert.AreEqual("Bearer synthetic-tts-key", _gateway.Authorization);
-        Assert.AreEqual("https://tts.aiursoft.com/api/tts", _gateway.Endpoint);
-        StringAssert.Contains(_gateway.Form, "voice=broadcasting");
-        StringAssert.Contains(Uri.UnescapeDataString(_gateway.Form), "text=第三轮诗歌");
+        Assert.AreEqual("https://tts.aiursoft.com/api/jobs", _gateway.Endpoint);
+        StringAssert.Contains(_gateway.Form, "\"voice\":\"broadcasting\"");
+        Assert.AreEqual("第三轮诗歌", System.Text.Json.JsonDocument.Parse(_gateway.Form).RootElement.GetProperty("text").GetString());
         _options.Voice = "another-profile";
         await Speak();
-        StringAssert.Contains(_gateway.Form, "voice=another-profile");
+        StringAssert.Contains(_gateway.Form, "\"voice\":\"another-profile\"");
     }
 
     [TestMethod]
@@ -118,8 +118,77 @@ public class PhotoSpeechTests
         Assert.AreEqual(504, ((ObjectResult)await Speak()).StatusCode);
     }
 
+    [TestMethod]
+    public async Task QueuedJobSubmissionReturnsWithoutWaitingAndCanPollAndDownload()
+    {
+        _gateway.JobStatus = "queued";
+        var request = new SummarySpeechRequest { Summary = "第三轮诗歌" };
+        var submitted = (ObjectResult)await _controller.CreateSpeechJob(1, request, CancellationToken.None);
+        Assert.AreEqual(202, submitted.StatusCode);
+        var job = (SpeechJob)submitted.Value!;
+        Assert.AreEqual("queued", job.Status);
+        Assert.AreEqual(2, job.QueuePosition);
+        Assert.AreEqual(1, _gateway.Calls);
+        _gateway.JobStatus = "running";
+        var result = (SpeechJob)((OkObjectResult)await _controller.GetSpeechJob(1, job.Id, request, CancellationToken.None)).Value!;
+        Assert.AreEqual("running", result.Status);
+        Assert.AreEqual(1, result.CompletedSegments);
+        Assert.AreEqual(3, result.TotalSegments);
+        _gateway.JobStatus = "completed";
+        Assert.IsInstanceOfType<FileContentResult>(await _controller.GetSpeechAudio(1, job.Id, request, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task JobHandlesAreBoundToPhotoAndSummaryAndCannotContainArbitraryPaths()
+    {
+        var request = new SummarySpeechRequest { Summary = "第三轮诗歌" };
+        var job = (SpeechJob)((ObjectResult)await _controller.CreateSpeechJob(1, request, CancellationToken.None)).Value!;
+        var calls = _gateway.Calls;
+        Assert.IsInstanceOfType<NotFoundResult>(await _controller.GetSpeechJob(1, "../../other", request, CancellationToken.None));
+        Assert.IsInstanceOfType<NotFoundResult>(await _controller.GetSpeechAudio(1, job.Id[..^1] + "Z", request, CancellationToken.None));
+        _db.Photos.Add(new Photo { AlbumId = "test", FilePath = "second.png", Summary = request.Summary, SummaryGeneratedAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync();
+        Assert.IsInstanceOfType<NotFoundResult>(await _controller.GetSpeechJob(2, job.Id, request, CancellationToken.None));
+        Assert.AreEqual(calls, _gateway.Calls);
+    }
+
+    [TestMethod]
+    public async Task PromptChangesInvalidateJobPollingAndAudio()
+    {
+        var request = new SummarySpeechRequest { Summary = "第三轮诗歌" };
+        var job = (SpeechJob)((ObjectResult)await _controller.CreateSpeechJob(1, request, CancellationToken.None)).Value!;
+        _db.SystemStates.Single().SummaryPromptsModifiedAt = DateTime.UtcNow.AddMinutes(1);
+        await _db.SaveChangesAsync();
+        var calls = _gateway.Calls;
+        Assert.IsInstanceOfType<NotFoundResult>(await _controller.GetSpeechJob(1, job.Id, request, CancellationToken.None));
+        Assert.IsInstanceOfType<NotFoundResult>(await _controller.GetSpeechAudio(1, job.Id, request, CancellationToken.None));
+        Assert.AreEqual(calls, _gateway.Calls);
+    }
+
+    [TestMethod]
+    public async Task QueueCapacityAndExpiredHandlesPreserveRetryableStatuses()
+    {
+        var request = new SummarySpeechRequest { Summary = "第三轮诗歌" };
+        _gateway.Status = HttpStatusCode.TooManyRequests;
+        Assert.AreEqual(429, ((ObjectResult)await _controller.CreateSpeechJob(1, request, CancellationToken.None)).StatusCode);
+        _gateway.Status = HttpStatusCode.OK;
+        var job = (SpeechJob)((ObjectResult)await _controller.CreateSpeechJob(1, request, CancellationToken.None)).Value!;
+        _gateway.Status = HttpStatusCode.Gone;
+        Assert.AreEqual(410, ((ObjectResult)await _controller.GetSpeechAudio(1, job.Id, request, CancellationToken.None)).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task InvalidGatewayJobIsRejectedBeforeItCanBecomeAClientHandle()
+    {
+        _gateway.JobId = "../../other";
+        Assert.AreEqual(502, ((ObjectResult)await _controller.CreateSpeechJob(1,
+            new SummarySpeechRequest { Summary = "第三轮诗歌" }, CancellationToken.None)).StatusCode);
+    }
+
     private sealed class SpeechGateway : HttpMessageHandler, IHttpClientFactory
     {
+        public string JobStatus { get; set; } = "completed";
+        public string JobId { get; set; } = new('a', 32);
         public int Calls { get; private set; }
         public string Form { get; private set; } = "";
         public string? Authorization { get; private set; }
@@ -133,9 +202,17 @@ public class PhotoSpeechTests
         {
             Calls++;
             Authorization = request.Headers.Authorization?.ToString();
-            Endpoint = request.RequestUri?.AbsoluteUri;
-            Form = await request.Content!.ReadAsStringAsync(ct);
+            if (request.Method == HttpMethod.Post)
+            {
+                Endpoint = request.RequestUri?.AbsoluteUri;
+                Form = await request.Content!.ReadAsStringAsync(ct);
+            }
             if (BeforeResponse != null) await BeforeResponse();
+            if (!request.RequestUri!.AbsolutePath.EndsWith("/audio", StringComparison.Ordinal))
+                return new HttpResponseMessage(Status) { Content = JsonContent.Create(new
+                {
+                    id = JobId, status = JobStatus, queue_position = 2, completed_segments = 1, total_segments = 3
+                }) };
             var result = new HttpResponseMessage(Status) { Content = new ByteArrayContent(Empty ? [] : [1, 2, 3]) };
             result.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(ContentType);
             return result;

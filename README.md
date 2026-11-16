@@ -134,8 +134,10 @@ until narration ends, then resumes the text cycle. Selecting an earlier round,
 changing photos, closing the viewer or disabling playback stops the audio. If the
 browser blocks playback, use **点击播放**; failed requests offer **重试语音**.
 Speech is generated only on demand, through the authenticated PhotoRanking API;
-existing IndexTTS caching avoids repeating identical synthesis. Changed or expired
-summaries are rejected before and after generation.
+the TTS service persists and deduplicates synthesis tasks. The viewer displays queue
+position and segment progress while polling, then downloads the completed audio.
+Changing photos stops polling and playback; reopening reuses the shared task.
+Current-summary checks protect submission, polling and audio retrieval.
 
 Configure the server's existing `/data/appsettings.json` (or environment variables):
 
@@ -172,8 +174,9 @@ JPEG preview (at most 1536 pixels on the longest side, without source metadata) 
 the configured model endpoint. Keep the server behind authenticated access as for
 the existing photo and rating APIs.
 
-Speech uses the native IndexTTS form endpoint so inference does not block its
-health checks. Configure these server settings; the key is never sent to the browser:
+Speech requires the queue-enabled IndexTTS service. It derives the sibling
+`/api/jobs` task API from the configured native `/api/tts` endpoint, so existing
+deployment variables stay valid. Configure these settings; the key stays on the server:
 
 ```json
 "Tts": {
@@ -186,8 +189,10 @@ health checks. Configure these server settings; the key is never sent to the bro
 
 Use `Tts__Endpoint`, `Tts__Model`, `Tts__Voice` and `Tts__ApiKey` for environment
 overrides. For this single-engine service, `Model` names the voice profile used by
-Yuefu's reader (`broadcasting`); optional `Voice` overrides that profile. The native
-request sends `voice` and the stored third-round text, and receives WAV audio.
+Yuefu's reader (`broadcasting`); optional `Voice` overrides that profile. The task
+request sends `voice` and the stored third-round text. Submission returns a handle
+bound to that photo and answer; status requests wait asynchronously, and completed
+tasks provide WAV audio without holding one HTTP request throughout synthesis.
 Keep `ApiKey` in the deployment's private `.env.prod`; missing configuration leaves
 text summaries available and reports speech as unavailable when requested. There
 is no audio database migration or new background generation job.

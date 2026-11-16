@@ -58,35 +58,74 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
     }
 
     [HttpPost("photos/{photoId:int}/speech")]
-    public async Task<IActionResult> GetSpeech(int photoId, SummarySpeechRequest request, CancellationToken ct)
+    public Task<IActionResult> GetSpeech(int photoId, SummarySpeechRequest request, CancellationToken ct)
+        => WithCurrentSummary(photoId, request, async summary =>
+        {
+            var audio = await speech.SynthesizeAsync(photoId, summary, ct);
+            return File(audio.Content, audio.ContentType);
+        }, ct);
+
+    [HttpPost("photos/{photoId:int}/speech/jobs")]
+    public Task<IActionResult> CreateSpeechJob(int photoId, SummarySpeechRequest request, CancellationToken ct)
+        => WithCurrentSummary(photoId, request, async summary =>
+            StatusCode(202, await speech.SubmitAsync(photoId, summary, ct)), ct);
+
+    [HttpPost("photos/{photoId:int}/speech/jobs/{jobId}")]
+    public Task<IActionResult> GetSpeechJob(int photoId, string jobId, SummarySpeechRequest request, CancellationToken ct)
+        => WithCurrentSummary(photoId, request, async summary =>
+            Ok(await speech.StatusAsync(photoId, summary, jobId, ct)), ct);
+
+    [HttpPost("photos/{photoId:int}/speech/jobs/{jobId}/audio")]
+    public Task<IActionResult> GetSpeechAudio(int photoId, string jobId, SummarySpeechRequest request, CancellationToken ct)
+        => WithCurrentSummary(photoId, request, async summary =>
+        {
+            var audio = await speech.AudioAsync(photoId, summary, jobId, ct);
+            return File(audio.Content, audio.ContentType);
+        }, ct);
+
+    private async Task<IActionResult> WithCurrentSummary(int photoId, SummarySpeechRequest request,
+        Func<string, Task<IActionResult>> action, CancellationToken ct)
     {
         if (!await context.Photos.AnyAsync(p => p.Id == photoId, ct)) return NotFound();
         var summary = await service.GetSummaryAsync(photoId, ct);
         if (string.IsNullOrWhiteSpace(summary)) return NotFound();
-        // Only the stored, current final answer may be synthesized, never arbitrary client text.
         if (request.Summary != summary) return Conflict(new { error = "The summary has changed." });
         if (!speech.IsConfigured) return StatusCode(503, new { error = "Speech is not configured." });
         try
         {
-            var audio = await speech.SynthesizeAsync(summary, ct);
+            var result = await action(summary);
             if (await service.GetSummaryAsync(photoId, ct) != summary)
                 return Conflict(new { error = "The summary has changed." });
-            return File(audio.Content, audio.ContentType);
+            return result;
+        }
+        catch (ArgumentException)
+        {
+            return NotFound();
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return StatusCode(504, new { error = "Speech generation timed out." });
+            return StatusCode(504, new { error = "Speech request timed out." });
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning("Speech generation failed with status {Status} for photo {PhotoId}.",
-                ex.StatusCode, photoId);
-            return StatusCode(502, new { error = "Speech generation failed." });
+            logger.LogWarning("Speech request failed with status {Status} for photo {PhotoId}.", ex.StatusCode, photoId);
+            var status = ex.StatusCode switch
+            {
+                System.Net.HttpStatusCode.TooManyRequests => 429,
+                System.Net.HttpStatusCode.NotFound => 404,
+                System.Net.HttpStatusCode.Gone => 410,
+                System.Net.HttpStatusCode.Conflict => 409,
+                _ => 502
+            };
+            return StatusCode(status, new { error = "Speech request failed. Please retry." });
         }
         catch (InvalidDataException)
         {
-            return StatusCode(502, new { error = "Speech service did not return audio." });
+            return StatusCode(502, new { error = "Speech service returned an invalid response." });
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return StatusCode(502, new { error = "Speech service returned an invalid response." });
         }
     }
-
 }
