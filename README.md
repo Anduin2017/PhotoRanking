@@ -111,7 +111,8 @@ only coverage does not invalidate summaries. A useful workflow is to tune prompt
 at 1%, then increase coverage to 40% once satisfied.
 
 The viewer plays the saved answers in reverse order: third, second, first, then
-repeats. Each answer scrolls to its end and remains there for four seconds before
+repeats. Each answer starts scrolling after two seconds at one rendered line every
+two seconds, scrolls to its end and remains there for four seconds before
 the next one starts. Use the round buttons to select an answer directly; reduced
 motion disables automatic playback while keeping these buttons available. Unchanged
 background refreshes preserve the current answer and reading position.

@@ -114,13 +114,35 @@ describe('PhotoViewerComponent', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 100 });
     expect(component.summaryResponses.map(x => x.round)).toEqual([3, 2, 1]);
     expect(component.summary).toBe('third');
-    for (const [start, end, text] of [[3000, 7000, 'second'], [10000, 14000, 'first'], [17000, 21000, 'third']] as const) {
+    for (const [start, end, text] of [[2000, 6000, 'second'], [8000, 12000, 'first'], [14000, 18000, 'third']] as const) {
       clock.mockReturnValue(start); component.scrollSummary();
       clock.mockReturnValue(end - 1); component.scrollSummary();
       expect(component.summary).not.toBe(text);
       clock.mockReturnValue(end); component.scrollSummary();
       expect(component.summary).toBe(text);
     }
+  });
+
+  it('starts untouched summaries after two seconds and scrolls one actual line every two seconds', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    vi.spyOn(photoServiceMock, 'getSummary').mockReturnValue(of({ summary: 'long poem' }));
+    component.updateOverlay(1);
+    fixture.detectChanges();
+    const scroller = component.summaryScroller!.nativeElement;
+    scroller.style.lineHeight = '37px';
+    Object.defineProperty(scroller, 'clientHeight', { value: 100 });
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1000 });
+    clock.mockReturnValue(1999); component.scrollSummary();
+    expect(scroller.scrollTop).toBe(0);
+    for (let time = 2000; time <= 4000; time += 100) {
+      clock.mockReturnValue(time); component.scrollSummary();
+    }
+    expect(scroller.scrollTop).toBeCloseTo(37, 0);
+    component.pauseSummaryScroll(new Event('wheel'));
+    clock.mockReturnValue(13000); component.scrollSummary();
+    expect(scroller.scrollTop).toBeCloseTo(37, 0);
+    clock.mockReturnValue(14000); component.scrollSummary();
+    expect(scroller.scrollTop).toBeCloseTo(37, 0);
   });
 
   it('keeps the current answer and scroll position when polling unchanged responses', () => {

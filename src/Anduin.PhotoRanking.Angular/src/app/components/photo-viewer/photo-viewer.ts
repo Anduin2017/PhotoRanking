@@ -30,6 +30,8 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   summary: string | null = null;
   summaryResponses: { round: number; text: string }[] = [];
   summaryIndex = 0;
+  private summaryLastScrollAt: number | null = null;
+  private summaryScrollRemainder = 0;
   private summaryBottomSince: number | null = null;
   private destroyed = false;
   private activePhotoId: number | null = null;
@@ -67,10 +69,20 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         Date.now() < this.summaryPauseUntil || this.summaryPointer ||
         window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       this.summaryBottomSince = null;
+      this.summaryLastScrollAt = null;
+      this.summaryScrollRemainder = 0;
       return;
     }
+    const now = Date.now();
+    const elapsed = now - (this.summaryLastScrollAt ?? now);
+    this.summaryLastScrollAt = now;
     if (element.scrollTop + element.clientHeight < element.scrollHeight - 1) {
-      element.scrollTop += 1;
+      const style = window.getComputedStyle(element);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.9;
+      const distance = this.summaryScrollRemainder + lineHeight * elapsed / 2000;
+      const pixels = Math.floor(distance);
+      element.scrollTop += pixels;
+      this.summaryScrollRemainder = distance - pixels;
       this.summaryBottomSince = null;
     } else if (this.summaryResponses.length > 1) {
       this.summaryBottomSince ??= Date.now();
@@ -86,7 +98,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.summaryIndex = index;
     this.summary = response.text;
     this.summaryBottomSince = null;
-    this.summaryPauseUntil = Date.now() + 3000;
+    this.summaryLastScrollAt = null;
+    this.summaryScrollRemainder = 0;
+    this.summaryPauseUntil = Date.now() + 2000;
     this.cdr.detectChanges();
     if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
   }
@@ -180,7 +194,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.summaryResponses = [];
     this.summaryIndex = 0;
     this.summaryBottomSince = null;
-    this.summaryPauseUntil = Date.now() + 3000;
+    this.summaryLastScrollAt = null;
+    this.summaryScrollRemainder = 0;
+    this.summaryPauseUntil = Date.now() + 2000;
     if (this.summaryScroller) this.summaryScroller.nativeElement.scrollTop = 0;
     this.refreshSummary();
     this.guessedScore = null;
@@ -223,7 +239,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   toggleSummary() {
     this.summaryBottomSince = null;
-    this.summaryPauseUntil = Date.now() + 3000;
+    this.summaryLastScrollAt = null;
+    this.summaryScrollRemainder = 0;
+    this.summaryPauseUntil = Date.now() + 2000;
     if (this.showSummary) this.refreshSummary();
   }
 
