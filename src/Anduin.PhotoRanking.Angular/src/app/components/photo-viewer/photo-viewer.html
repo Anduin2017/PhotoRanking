@@ -75,8 +75,8 @@
                 自动播放
             </label>
             <span *ngIf="speechMessage" class="summary-toggle" role="status">{{ speechMessage }}</span>
-            <button *ngIf="speechState === 'blocked'" class="rating-btn" (click)="playSummarySpeech()">点击播放</button>
-            <button *ngIf="speechState === 'error'" class="rating-btn" (click)="retrySummarySpeech()">重试语音</button>
+            <button *ngIf="speechState === 'blocked'" class="rating-btn" style="width:auto;min-width:5em;white-space:nowrap" (click)="playSummarySpeech()">点击播放</button>
+            <button *ngIf="speechState === 'error'" class="rating-btn" style="width:auto;min-width:5em;white-space:nowrap" (click)="retrySummarySpeech()">重试语音</button>
             <div class="rating-score-buttons">
                 <button class="rating-btn"
                         *ngFor="let score of scoreOptions"
