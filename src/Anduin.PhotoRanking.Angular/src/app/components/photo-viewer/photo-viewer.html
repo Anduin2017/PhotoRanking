@@ -9,6 +9,11 @@
     </div>
 
     <aside *ngIf="showSummary" class="summary-panel" aria-label="图片摘要" (click)="$event.stopPropagation()">
+        <div class="summary-rounds summary-toggle" style="font-size:0.7em" *ngIf="summaryResponses.length > 1" aria-label="摘要回答轮次">
+            <button type="button" *ngFor="let response of summaryResponses; let i = index"
+                style="background:none;border:0;color:inherit;cursor:pointer" [style.opacity]="summaryIndex === i ? 1 : 0.5"
+                [attr.aria-pressed]="summaryIndex === i" (click)="selectSummaryResponse(i)">第{{ response.round }}轮</button>
+        </div>
         <div *ngIf="summary; else noSummary" #summaryScroller class="summary-scroller" tabindex="0"
             (pointerdown)="startSummaryDrag($event)" (pointermove)="dragSummary($event)"
             (pointerup)="endSummaryDrag()" (pointercancel)="endSummaryDrag()" (lostpointercapture)="endSummaryDrag()"

@@ -53,6 +53,12 @@ export interface AlbumDetails {
   photos: Photo[];
 }
 
+export interface SummaryResponses {
+  summary: string | null;
+  response1?: string | null;
+  response2?: string | null;
+}
+
 export interface SummarySettings {
   prompt1: string;
   prompt2: string;
@@ -117,8 +123,8 @@ export class PhotoService {
     });
   }
 
-  getSummary(photoId: number): Observable<{ summary: string | null }> {
-    return this.http.get<{ summary: string | null }>(`${this.apiBase}/summary/photos/${photoId}`);
+  getSummary(photoId: number): Observable<SummaryResponses> {
+    return this.http.get<SummaryResponses>(`${this.apiBase}/summary/photos/${photoId}`);
   }
 
   getImageUrl(filePath: string): string {

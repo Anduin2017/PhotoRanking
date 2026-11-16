@@ -33,7 +33,8 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
             configured = service.IsConfigured,
             examples,
             targetCount = await target.CountAsync(ct),
-            completedCount = await target.CountAsync(p => p.Summary != null && p.SummaryGeneratedAt != null &&
+            completedCount = await target.CountAsync(p => p.Summary != null && p.SummaryResponse1 != null &&
+                p.SummaryResponse2 != null && p.SummaryGeneratedAt != null &&
                 p.SummaryGeneratedAt >= state.SummaryPromptsModifiedAt, ct)
         });
     }
@@ -52,6 +53,6 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
     public async Task<IActionResult> GetSummary(int photoId, CancellationToken ct)
     {
         if (!await context.Photos.AnyAsync(p => p.Id == photoId, ct)) return NotFound();
-        return Ok(new { summary = await service.GetSummaryAsync(photoId, ct) });
+        return Ok(await service.GetResponsesAsync(photoId, ct));
     }
 }

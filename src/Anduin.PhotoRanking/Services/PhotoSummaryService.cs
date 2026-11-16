@@ -64,13 +64,19 @@ public class PhotoSummaryService(
     }
 
     public async Task<string?> GetSummaryAsync(int photoId, CancellationToken ct)
+        => (await GetResponsesAsync(photoId, ct)).Summary;
+
+    public async Task<SummaryResponses> GetResponsesAsync(int photoId, CancellationToken ct)
     {
-        // One SQL statement checks both timestamps: an obsolete poem is never returned.
+        // One SQL statement checks all responses against the same prompt watermark.
         return await context.Photos.NotCacheable().Where(p => p.Id == photoId && p.Summary != null &&
                 p.SummaryGeneratedAt != null && p.SummaryGeneratedAt >=
                 (context.SystemStates.Select(s => (DateTime?)s.SummaryPromptsModifiedAt).FirstOrDefault()
                  ?? DateTime.MinValue))
-            .Select(p => p.Summary).FirstOrDefaultAsync(ct);
+            .Select(p => new SummaryResponses
+            {
+                Summary = p.Summary, Response1 = p.SummaryResponse1, Response2 = p.SummaryResponse2
+            }).FirstOrDefaultAsync(ct) ?? new SummaryResponses();
     }
 
     public async Task RunOnceAsync(CancellationToken ct)
@@ -85,7 +91,8 @@ public class PhotoSummaryService(
         if (settings.SummaryTopPercent <= 0) return;
         var target = await GetTargetPhotosAsync(settings, ct);
         var pendingIds = await target
-            .Where(p => p.Summary == null || p.SummaryGeneratedAt == null ||
+            .Where(p => p.Summary == null || p.SummaryResponse1 == null || p.SummaryResponse2 == null ||
+                        p.SummaryGeneratedAt == null ||
                         p.SummaryGeneratedAt < settings.SummaryPromptsModifiedAt)
             .Select(p => p.Id).ToListAsync(ct);
 
@@ -141,7 +148,7 @@ public class PhotoSummaryService(
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.ApiKey);
         var messages = new List<object>();
         var prompts = new[] { settings.SummaryPrompt1, settings.SummaryPrompt2, settings.SummaryPrompt3 };
-        string? answer = null;
+        var answers = new List<string>();
         for (var i = 0; i < prompts.Length; i++)
         {
             if ((await GetSettingsAsync(ct)).SummaryPromptsModifiedAt != settings.SummaryPromptsModifiedAt) return;
@@ -153,9 +160,10 @@ public class PhotoSummaryService(
                 new { model = options.Value.Model, stream = false, messages }, ct);
             response.EnsureSuccessStatusCode();
             var body = JObject.Parse(await response.Content.ReadAsStringAsync(ct));
-            answer = body["message"]?["content"]?.Value<string>();
+            var answer = body["message"]?["content"]?.Value<string>();
             if (body["error"] != null || body["done"]?.Value<bool>() != true || string.IsNullOrWhiteSpace(answer))
                 throw new InvalidOperationException("The summary model did not return a complete answer.");
+            answers.Add(answer);
             messages.Add(new { role = "assistant", content = answer });
         }
 
@@ -163,7 +171,9 @@ public class PhotoSummaryService(
         // Atomic guard: a prompt edit while the last request runs must not revive an old poem.
         var saved = await context.Photos.Where(p => p.Id == photo.Id &&
                 context.SystemStates.Any(s => s.SummaryPromptsModifiedAt == settings.SummaryPromptsModifiedAt))
-            .ExecuteUpdateAsync(u => u.SetProperty(p => p.Summary, answer)
+            .ExecuteUpdateAsync(u => u.SetProperty(p => p.Summary, answers[2])
+                .SetProperty(p => p.SummaryResponse1, answers[0])
+                .SetProperty(p => p.SummaryResponse2, answers[1])
                 .SetProperty(p => p.SummaryGeneratedAt, generatedAt), ct);
         if (saved > 0) logger.LogInformation("Summarized photo {PhotoId}.", photo.Id);
     }

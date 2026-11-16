@@ -131,6 +131,12 @@ namespace Anduin.PhotoRanking.Data.Migrations
                     b.Property<DateTime?>("SummaryGeneratedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SummaryResponse1")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SummaryResponse2")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("ViewCount")
                         .HasColumnType("INTEGER");
 

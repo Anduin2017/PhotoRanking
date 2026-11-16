@@ -62,7 +62,7 @@ public class PhotoSummaryServiceTests
     }, CancellationToken.None);
 
     [TestMethod]
-    public async Task ThreeRoundsKeepImageAndPreviousAnswersAndOnlyPersistFinalPoem()
+    public async Task ThreeRoundsKeepImageAndPreviousAnswersAndPersistEveryAnswer()
     {
         await _service.RunOnceAsync(CancellationToken.None);
         Assert.HasCount(3, _model.Requests);
@@ -78,6 +78,10 @@ public class PhotoSummaryServiceTests
         Assert.AreEqual("answer 2", third[3]["content"]!.Value<string>());
         Assert.AreEqual("Write the poem", third[4]["content"]!.Value<string>());
         Assert.AreEqual("answer 3", await _service.GetSummaryAsync(1, CancellationToken.None));
+        var responses = await _service.GetResponsesAsync(1, CancellationToken.None);
+        Assert.AreEqual("answer 1", responses.Response1);
+        Assert.AreEqual("answer 2", responses.Response2);
+        Assert.AreEqual("answer 3", responses.Summary);
         await _service.RunOnceAsync(CancellationToken.None);
         Assert.HasCount(3, _model.Requests, "A completed photo must not be regenerated on the next sweep.");
     }
@@ -111,6 +115,9 @@ public class PhotoSummaryServiceTests
         await Save(10, "A different poem");
         Assert.IsNull(await _service.GetSummaryAsync(1, CancellationToken.None));
         Assert.IsNull(await _service.GetSummaryAsync(4, CancellationToken.None));
+        var expired = await _service.GetResponsesAsync(1, CancellationToken.None);
+        Assert.IsNull(expired.Response1);
+        Assert.IsNull(expired.Response2);
         await _service.RunOnceAsync(CancellationToken.None);
         Assert.IsNotNull(await _service.GetSummaryAsync(1, CancellationToken.None));
         Assert.IsNull(await _service.GetSummaryAsync(4, CancellationToken.None));
@@ -257,6 +264,33 @@ public class PhotoSummaryServiceTests
         Assert.IsFalse(new SummaryOptions { ApiKey = "test", Endpoint = "file:///tmp/model" }.IsConfigured);
     }
 
+    [TestMethod]
+    public async Task LegacyPoemStaysVisibleDuringBackfillAndFailureCannotPublishPartialAnswers()
+    {
+        var oldTime = DateTime.UtcNow;
+        await _context.Photos.Where(p => p.Id == 1).ExecuteUpdateAsync(u =>
+            u.SetProperty(p => p.Summary, "Existing final poem").SetProperty(p => p.SummaryGeneratedAt, oldTime));
+        var legacy = await _service.GetResponsesAsync(1, CancellationToken.None);
+        Assert.AreEqual("Existing final poem", legacy.Summary);
+        Assert.IsNull(legacy.Response1);
+        Assert.IsNull(legacy.Response2);
+        _model.FailAt = 2;
+        await _service.RunOnceAsync(CancellationToken.None);
+        Assert.HasCount(2, _model.Requests);
+        var failed = await _service.GetResponsesAsync(1, CancellationToken.None);
+        Assert.AreEqual("Existing final poem", failed.Summary);
+        Assert.IsNull(failed.Response1);
+        Assert.IsNull(failed.Response2);
+        _model.FailAt = null;
+        await _service.RunOnceAsync(CancellationToken.None);
+        var complete = await _service.GetResponsesAsync(1, CancellationToken.None);
+        Assert.AreEqual("answer 3", complete.Response1);
+        Assert.AreEqual("answer 4", complete.Response2);
+        Assert.AreEqual("answer 5", complete.Summary);
+        await _service.RunOnceAsync(CancellationToken.None);
+        Assert.HasCount(5, _model.Requests);
+    }
+
     private class RecordingModel : HttpMessageHandler, IHttpClientFactory
     {
         public List<JObject> Requests { get; } = [];
@@ -265,6 +299,7 @@ public class PhotoSummaryServiceTests
         public string? LastToken { get; private set; }
         public Func<int, Task>? OnRequest { get; set; }
         public bool FailFirst { get; set; }
+        public int? FailAt { get; set; }
         public bool CompleteAnswer { get; set; } = true;
         public HttpClient CreateClient(string name) => new(this, false);
 
@@ -277,7 +312,7 @@ public class PhotoSummaryServiceTests
             LastEndpoint = request.RequestUri?.AbsoluteUri;
             LastToken = request.Headers.Authorization?.Parameter;
             if (OnRequest != null) await OnRequest(Requests.Count);
-            if (FailFirst && Requests.Count == 1) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            if ((FailFirst && Requests.Count == 1) || Requests.Count == FailAt) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(new JObject
