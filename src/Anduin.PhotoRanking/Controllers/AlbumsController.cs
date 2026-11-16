@@ -68,19 +68,19 @@ public class AlbumsController : ControllerBase
         // 根据sortBy参数排序
         var photosList = album.Photos.ToList();
         IEnumerable<Photo> photos = photosList;
-        if (sortBy.ToLower() == "estimatedscore")
+        if (sortBy.ToLowerInvariant() == "estimatedscore")
         {
-            photos = photosList.OrderByDescending(p => p.EstimatedScore ?? -1).ThenBy(p => p.FilePath);
+            photos = photosList.OrderByDescending(p => p.EstimatedScore ?? -1).ThenBy(p => p.FilePath, StringComparer.Ordinal);
         }
         else
         {
-            photos = sortBy.ToLower() switch
+            photos = sortBy.ToLowerInvariant() switch
             {
                 "score" or "overallscore" => photos.OrderByDescending(p => p.IndependentScore ?? p.EstimatedScore ?? -1),
-                "rated" => photos.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath),
-                "unrated" => photos.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath),
+                "rated" => photos.OrderByDescending(p => p.IndependentScore.HasValue).ThenByDescending(p => p.IndependentScore).ThenBy(p => p.FilePath, StringComparer.Ordinal),
+                "unrated" => photos.OrderBy(p => p.IndependentScore.HasValue).ThenBy(p => p.FilePath, StringComparer.Ordinal),
                 "manualscore" or "independentscore" => photos.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.EstimatedScore),
-                _ => photos.OrderBy(p => p.FilePath)
+                _ => photos.OrderBy(p => p.FilePath, StringComparer.Ordinal)
             };
         }
 
@@ -110,7 +110,7 @@ public class AlbumsController : ControllerBase
         var query = _context.Photos.Where(p => p.AlbumId == albumId);
 
         // 根据sortBy参数排序
-        query = sortBy.ToLower() switch
+        query = sortBy.ToLowerInvariant() switch
         {
             "estimatedscore" => query.OrderByDescending(p => p.EstimatedScore).ThenBy(p => p.FilePath),
             "manualscore" or "independentscore" => query.OrderByDescending(p => p.IndependentScore).ThenByDescending(p => p.EstimatedScore),
@@ -127,7 +127,7 @@ public class AlbumsController : ControllerBase
             .ToListAsync();
 
         // 如果按独立分排序且不分页，返回所有照片
-        if (sortBy.ToLower() == "independentscore" && page == 1 && pageSize == 30)
+        if (sortBy.ToLowerInvariant() == "independentscore" && page == 1 && pageSize == 30)
         {
             photos = await _context.Photos
                 .Where(p => p.AlbumId == albumId)
