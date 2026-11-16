@@ -42,6 +42,8 @@ public class Startup : IWebStartup
         services.AddScoped<DedupService>();
         services.Configure<SummaryOptions>(configuration.GetSection(SummaryOptions.SectionName));
         services.AddScoped<PhotoSummaryService>();
+        services.Configure<TtsOptions>(configuration.GetSection(TtsOptions.SectionName));
+        services.AddScoped<PhotoSpeechService>();
 
         services.AddHostedService<PredictorBackgroundService>();
         services.AddHostedService<SummaryBackgroundService>();

@@ -41,6 +41,8 @@ public class TestStartup : IWebStartup
         services.AddScoped<ImageAnalysisService>();
         services.Configure<SummaryOptions>(configuration.GetSection(SummaryOptions.SectionName));
         services.AddScoped<PhotoSummaryService>();
+        services.Configure<TtsOptions>(configuration.GetSection(TtsOptions.SectionName));
+        services.AddScoped<PhotoSpeechService>();
 
         // Controllers and localization
         services.AddControllersWithViews()

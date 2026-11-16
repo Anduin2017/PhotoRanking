@@ -11,7 +11,8 @@ namespace Anduin.PhotoRanking.Controllers;
 [ApiController]
 [Route("api/summary")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class SummaryController(PhotoSummaryService service, AppDbContext context) : ControllerBase
+public class SummaryController(PhotoSummaryService service, AppDbContext context,
+    PhotoSpeechService speech, ILogger<SummaryController> logger) : ControllerBase
 {
     [HttpGet("settings")]
     public async Task<IActionResult> GetSettings(CancellationToken ct)
@@ -55,4 +56,37 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
         if (!await context.Photos.AnyAsync(p => p.Id == photoId, ct)) return NotFound();
         return Ok(await service.GetResponsesAsync(photoId, ct));
     }
+
+    [HttpPost("photos/{photoId:int}/speech")]
+    public async Task<IActionResult> GetSpeech(int photoId, SummarySpeechRequest request, CancellationToken ct)
+    {
+        if (!await context.Photos.AnyAsync(p => p.Id == photoId, ct)) return NotFound();
+        var summary = await service.GetSummaryAsync(photoId, ct);
+        if (string.IsNullOrWhiteSpace(summary)) return NotFound();
+        // Only the stored, current final answer may be synthesized, never arbitrary client text.
+        if (request.Summary != summary) return Conflict(new { error = "The summary has changed." });
+        if (!speech.IsConfigured) return StatusCode(503, new { error = "Speech is not configured." });
+        try
+        {
+            var audio = await speech.SynthesizeAsync(summary, ct);
+            if (await service.GetSummaryAsync(photoId, ct) != summary)
+                return Conflict(new { error = "The summary has changed." });
+            return File(audio.Content, audio.ContentType);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return StatusCode(504, new { error = "Speech generation timed out." });
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning("Speech generation failed with status {Status} for photo {PhotoId}.",
+                ex.StatusCode, photoId);
+            return StatusCode(502, new { error = "Speech generation failed." });
+        }
+        catch (InvalidDataException)
+        {
+            return StatusCode(502, new { error = "Speech service did not return audio." });
+        }
+    }
+
 }

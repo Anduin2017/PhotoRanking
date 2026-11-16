@@ -1,6 +1,7 @@
 import { Component, ElementRef, EventEmitter, Input, OnInit, Output, ViewChild, AfterViewInit, OnDestroy, HostListener, ChangeDetectorRef, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { Photo, PhotoService } from '../../services/photo';
 import Swiper from 'swiper';
 import { Navigation, Virtual, Zoom } from 'swiper/modules';
@@ -26,6 +27,14 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   @ViewChild('swiperContainer') swiperContainer!: ElementRef;
   @ViewChild('summaryScroller') summaryScroller?: ElementRef<HTMLElement>;
 
+  autoReadSummary = false;
+  speechState: 'idle' | 'loading' | 'playing' | 'blocked' | 'error' = 'idle';
+  speechMessage = '';
+  private summaryAudio: HTMLAudioElement | null = null;
+  private speechRequest: Subscription | null = null;
+  private speechUrl: string | null = null;
+  private speechText: string | null = null;
+  private speechGeneration = 0;
   showSummary = true;
   summary: string | null = null;
   summaryResponses: { round: number; text: string }[] = [];
@@ -84,7 +93,9 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
       element.scrollTop += pixels;
       this.summaryScrollRemainder = distance - pixels;
       this.summaryBottomSince = null;
-    } else if (this.summaryResponses.length > 1) {
+    } else if (this.summaryResponses.length > 1 &&
+        !(this.summaryResponses[this.summaryIndex]?.round === 3 &&
+          ['loading', 'playing', 'blocked'].includes(this.speechState))) {
       this.summaryBottomSince ??= Date.now();
       if (Date.now() - this.summaryBottomSince >= 4000) {
         this.selectSummaryResponse((this.summaryIndex + 1) % this.summaryResponses.length);
@@ -95,6 +106,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   selectSummaryResponse(index: number) {
     const response = this.summaryResponses[index];
     if (!response) return;
+    if (response.round !== 3) this.stopSummarySpeech();
     this.summaryIndex = index;
     this.summary = response.text;
     this.summaryBottomSince = null;
@@ -123,6 +135,7 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
 
   ngOnDestroy() {
     this.destroyed = true;
+    this.stopSummarySpeech();
     if (this.summaryRefreshTimer) clearInterval(this.summaryRefreshTimer);
     if (this.summaryScrollTimer) clearInterval(this.summaryScrollTimer);
     this.stopSlideshow();
@@ -189,6 +202,8 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   updateOverlay(photoId: number) {
     if (!photoId) return;
 
+    this.stopSummarySpeech();
+    this.speechText = null;
     this.activePhotoId = photoId;
     this.summary = null;
     this.summaryResponses = [];
@@ -223,18 +238,115 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
         ].filter((response): response is { round: number; text: string } => !!response.text?.trim());
         // Polling unchanged responses must not restart playback at round three.
         if (JSON.stringify(this.summaryResponses) !== JSON.stringify(responses)) {
+          if (responses.find(r => r.round === 3)?.text !== this.summaryResponses.find(r => r.round === 3)?.text) {
+            this.stopSummarySpeech();
+            this.speechText = null;
+          }
           this.summaryResponses = responses;
           this.summaryIndex = 0;
           this.summary = null;
           this.summaryBottomSince = null;
           if (responses.length) this.selectSummaryResponse(0);
         }
+        this.startSummarySpeech();
         this.cdr.detectChanges();
       },
       error: () => {
-        if (this.activePhotoId === id) this.summary = null;
+        if (this.activePhotoId === id) {
+          this.stopSummarySpeech();
+          this.summary = null;
+          this.summaryResponses = [];
+        }
       }
     });
+  }
+
+  toggleSummarySpeech() {
+    this.stopSummarySpeech();
+    this.speechText = null;
+    if (!this.autoReadSummary) return;
+    const third = this.summaryResponses.findIndex(r => r.round === 3);
+    if (third >= 0) this.selectSummaryResponse(third);
+    this.startSummarySpeech();
+  }
+
+  private startSummarySpeech() {
+    const text = this.summaryResponses.find(r => r.round === 3)?.text;
+    const photoId = this.activePhotoId;
+    if (!this.autoReadSummary || this.destroyed || !photoId || !text || this.speechText === text ||
+        this.summaryResponses[this.summaryIndex]?.round !== 3) return;
+    this.stopSummarySpeech();
+    this.speechText = text;
+    this.speechState = 'loading';
+    this.speechMessage = '正在生成语音…';
+    const generation = this.speechGeneration;
+    this.speechRequest = this.photoService.getSummarySpeech(photoId, text).subscribe({
+      next: audio => {
+        if (generation !== this.speechGeneration || this.destroyed) return;
+        this.speechUrl = URL.createObjectURL(audio);
+        this.summaryAudio ??= new Audio();
+        this.summaryAudio.src = this.speechUrl;
+        this.summaryAudio.onended = () => {
+          if (generation !== this.speechGeneration || this.destroyed) return;
+          this.speechState = 'idle';
+          this.speechMessage = '';
+          this.summaryBottomSince = null;
+          this.cdr.detectChanges();
+        };
+        this.summaryAudio.onerror = () => {
+          if (generation !== this.speechGeneration || this.destroyed) return;
+          this.speechState = 'error';
+          this.speechMessage = '语音播放失败';
+          this.cdr.detectChanges();
+        };
+        void this.playSummarySpeech();
+      },
+      error: error => {
+        if (generation !== this.speechGeneration || this.destroyed) return;
+        this.speechState = 'error';
+        this.speechMessage = error.status === 503 ? '语音服务尚未配置' : '语音生成失败，请稍后重试';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  async playSummarySpeech() {
+    if (!this.summaryAudio || !this.speechUrl) return;
+    const generation = this.speechGeneration;
+    try {
+      await this.summaryAudio.play();
+      if (generation !== this.speechGeneration || this.destroyed) return;
+      this.speechState = 'playing';
+      this.speechMessage = '正在朗读第三轮';
+    } catch (error) {
+      if (generation !== this.speechGeneration || this.destroyed) return;
+      this.speechState = (error as DOMException).name === 'NotAllowedError' ? 'blocked' : 'error';
+      this.speechMessage = this.speechState === 'blocked' ? '点击播放以允许声音' : '语音播放失败';
+    }
+    this.cdr.detectChanges();
+  }
+
+  retrySummarySpeech() {
+    this.speechText = null;
+    this.startSummarySpeech();
+  }
+
+  private stopSummarySpeech() {
+    this.speechGeneration++;
+    this.speechRequest?.unsubscribe();
+    this.speechRequest = null;
+    if (this.summaryAudio) {
+      this.summaryAudio.onended = null;
+      this.summaryAudio.onerror = null;
+      this.summaryAudio.pause();
+      this.summaryAudio.removeAttribute('src');
+      this.summaryAudio.load();
+    }
+    if (this.speechUrl) URL.revokeObjectURL(this.speechUrl);
+    this.speechUrl = null;
+    this.speechState = 'idle';
+    this.speechMessage = '';
+    this.summaryBottomSince = null;
   }
 
   toggleSummary() {
@@ -271,6 +383,8 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
   }
 
   onClose() {
+    this.autoReadSummary = false;
+    this.stopSummarySpeech();
     this.stopSlideshow();
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(err => console.error(err));
