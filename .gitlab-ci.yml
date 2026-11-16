@@ -29,7 +29,7 @@ before_script:
       <configuration>
           <packageSources>
               <clear />
-              <add key="aiursoft" value="https://nuget.aiursoft.com/v3/index.json" />
+              <add key="aiursoft" value="https://nupkg.aiursoft.com/v3/index.json" />
           </packageSources>
       </configuration>
       NUGETEOF
@@ -43,7 +43,7 @@ variables:
     GIT_CLONE_PATH: "$CI_BUILDS_DIR/$CI_PROJECT_NAME/$CI_PIPELINE_ID/$CI_JOB_ID"
     MSBUILDDISABLENODEREUSE: "1"
     DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-    CUSTOM_NUGET_ARGS: "--add-source https://nuget.aiursoft.com/v3/index.json --configfile ./nuget.config"
+    CUSTOM_NUGET_ARGS: "--add-source https://nupkg.aiursoft.com/v3/index.json --configfile ./nuget.config"
 
 build:
     stage: build
@@ -153,7 +153,7 @@ deploy_local_nuget:
     script:
         - |
             for file in $(find . -name "*.nupkg"); do
-              dotnet nuget push "$file" --api-key "$LOCAL_NUGET_API_KEY" --source "https://nuget.aiursoft.com/v3/index.json" --skip-duplicate || exit 1;
+              dotnet nuget push "$file" --api-key "$LOCAL_NUGET_API_KEY" --source "https://nupkg.aiursoft.com/v3/index.json" --skip-duplicate || exit 1;
             done
     rules:
         - if: '$CI_COMMIT_BRANCH == "master"'
