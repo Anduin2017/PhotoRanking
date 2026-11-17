@@ -77,6 +77,18 @@ export interface SummarySettings {
   targetCount?: number;
   completedCount?: number;
   examples?: Photo[];
+  generation?: SummaryGenerationStatus;
+}
+
+export interface SummaryGenerationStatus {
+  photoId: number | null;
+  round: number;
+  completedRounds: number;
+  phase: 'idle' | 'waiting' | 'generating' | 'saved' | 'completed' | 'retrying';
+  waitingSeconds: number;
+  generatingSeconds: number;
+  nextRetryAt: string | null;
+  error: string | null;
 }
 
 export interface GlobalStats {

@@ -40,7 +40,9 @@ public class Startup : IWebStartup
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
         services.AddScoped<DedupService>();
-        services.Configure<SummaryOptions>(configuration.GetSection(SummaryOptions.SectionName));
+        services.AddOptions<SummaryOptions>().Bind(configuration.GetSection(SummaryOptions.SectionName))
+            .ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton<SummaryProgress>();
         services.AddScoped<PhotoSummaryService>();
         services.Configure<TtsOptions>(configuration.GetSection(TtsOptions.SectionName));
         services.AddScoped<PhotoSpeechService>();

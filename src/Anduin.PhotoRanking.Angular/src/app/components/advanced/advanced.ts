@@ -60,6 +60,7 @@ export class AdvancedComponent implements OnInit, OnDestroy {
             this.summarySettings.targetCount = settings.targetCount;
             this.summarySettings.configured = settings.configured;
             this.summarySettings.examples = settings.examples;
+            this.summarySettings.generation = settings.generation;
           }
         },
         error: () => { /* Keep the last successful progress. */ }

@@ -40,6 +40,7 @@ public class TestStartup : IWebStartup
         services.AddScoped<SeederService>();
         services.AddScoped<ImageAnalysisService>();
         services.Configure<SummaryOptions>(configuration.GetSection(SummaryOptions.SectionName));
+        services.AddSingleton<SummaryProgress>();
         services.AddScoped<PhotoSummaryService>();
         services.Configure<TtsOptions>(configuration.GetSection(TtsOptions.SectionName));
         services.AddScoped<PhotoSpeechService>();

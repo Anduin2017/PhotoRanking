@@ -118,4 +118,29 @@ public class MigrationCompatibilityTests
         Assert.AreEqual(6d, photo.IndependentScore);
     }
 
+    [TestMethod]
+    public async Task CheckpointMigrationKeepsExistingThreeRoundAnswersAndScores()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        await using var context = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261116114458_SummaryResponses");
+        await context.Database.ExecuteSqlRawAsync("""
+            INSERT INTO Albums (AlbumId,Name,AlbumScore,KnownRate,StandardDeviation,PhotoCount,CreatedAt,UpdatedAt,RatedPhotoCount)
+            VALUES ('existing','Existing',0,0,0,1,'2026-01-01','2026-01-01',0);
+            INSERT INTO Photos (Id,FilePath,IndependentScore,OverallScore,Knownness,RatingCount,IsFixed,ViewCount,CreatedAt,
+                AlbumId,FileSize,LastModified,Summary,SummaryGeneratedAt,SummaryResponse1,SummaryResponse2)
+            VALUES (1,'existing.jpg',6,0,0,0,0,0,'2026-01-01','existing',123,'2026-01-01',
+                'Final poem','2026-11-16 11:00:00','First answer','Second answer');
+            """);
+        await migrator.MigrateAsync();
+        var photo = await context.Photos.SingleAsync();
+        Assert.AreEqual("First answer", photo.SummaryResponse1);
+        Assert.AreEqual("Second answer", photo.SummaryResponse2);
+        Assert.AreEqual("Final poem", photo.Summary);
+        Assert.AreEqual(6d, photo.IndependentScore);
+        Assert.IsNull(photo.SummaryCheckpointPromptsModifiedAt);
+        Assert.AreEqual(0, photo.SummaryCompletedRounds);
+    }
 }

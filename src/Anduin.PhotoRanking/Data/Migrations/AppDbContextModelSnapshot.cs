@@ -128,6 +128,12 @@ namespace Anduin.PhotoRanking.Data.Migrations
                     b.Property<string>("Summary")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("SummaryCheckpointPromptsModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SummaryCompletedRounds")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("SummaryGeneratedAt")
                         .HasColumnType("TEXT");
 
