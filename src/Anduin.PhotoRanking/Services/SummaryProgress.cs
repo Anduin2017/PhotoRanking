@@ -1,10 +1,17 @@
 namespace Anduin.PhotoRanking.Services;
 
-public sealed record SummaryGenerationStatus(
-    int? PhotoId, int Round, int CompletedRounds, string Phase,
-    DateTime? StartedAt, DateTime? FirstTokenAt, DateTime? FinishedAt,
-    DateTime? NextRetryAt, string? Error)
+public sealed record SummaryGenerationStatus
 {
+    public int? PhotoId { get; init; }
+    public int Round { get; init; }
+    public int CompletedRounds { get; init; }
+    public string Phase { get; init; } = "idle";
+    public DateTime? StartedAt { get; init; }
+    public DateTime? FirstTokenAt { get; init; }
+    public DateTime? FinishedAt { get; init; }
+    public DateTime? NextRetryAt { get; init; }
+    public string? Error { get; init; }
+
     // First-token wait includes gateway queueing and image/prompt prefill.
     public double WaitingSeconds => StartedAt == null ? 0 :
         Math.Max(0, ((FirstTokenAt ?? FinishedAt ?? DateTime.UtcNow) - StartedAt.Value).TotalSeconds);
@@ -21,7 +28,7 @@ public sealed class SummaryProgress
     private CancellationTokenSource? _active;
     private SummaryGenerationStatus _status = Idle();
 
-    private static SummaryGenerationStatus Idle() => new(null, 0, 0, "idle", null, null, null, null, null);
+    private static SummaryGenerationStatus Idle() => new();
 
     public SummaryGenerationStatus Get(DateTime version)
     {

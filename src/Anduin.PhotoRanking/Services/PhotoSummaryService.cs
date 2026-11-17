@@ -223,8 +223,9 @@ public class PhotoSummaryService(
                 else
                 {
                     var first = answers[0];
+                    var previousRound = i;
                     eligible = eligible.Where(p => p.SummaryCheckpointPromptsModifiedAt == settings.SummaryPromptsModifiedAt &&
-                        p.SummaryCompletedRounds == i && p.SummaryResponse1 == first);
+                        p.SummaryCompletedRounds == previousRound && p.SummaryResponse1 == first);
                     if (i == 2)
                     {
                         var second = answers[1];
