@@ -283,6 +283,13 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
     this.speechRequest = this.photoService.getSummarySpeech(photoId, text).subscribe({
       next: audio => {
         if (generation !== this.speechGeneration || this.destroyed) return;
+        if (!(audio instanceof Blob)) {
+          this.speechMessage = audio.status === 'queued'
+            ? `语音排队中${audio.queue_position ? '，第' + audio.queue_position + '位' : ''}`
+            : `正在合成语音${audio.total_segments ? '，' + audio.completed_segments + '/' + audio.total_segments + '段' : ''}`;
+          this.cdr.detectChanges();
+          return;
+        }
         this.speechUrl = URL.createObjectURL(audio);
         this.summaryAudio ??= new Audio();
         this.summaryAudio.src = this.speechUrl;
@@ -304,7 +311,8 @@ export class PhotoViewerComponent implements OnInit, AfterViewInit, OnDestroy, O
       error: error => {
         if (generation !== this.speechGeneration || this.destroyed) return;
         this.speechState = 'error';
-        this.speechMessage = error.status === 503 ? '语音服务尚未配置' : '语音生成失败，请稍后重试';
+        this.speechMessage = error.status === 503 ? '语音服务尚未配置'
+          : error.status === 429 ? '语音队列已满，请稍后重试' : '语音生成失败，请稍后重试';
         this.cdr.detectChanges();
       }
     });

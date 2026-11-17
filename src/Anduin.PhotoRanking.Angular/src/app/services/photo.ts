@@ -1,6 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map, Subject, tap } from 'rxjs';
+import { EMPTY, Observable, expand, map, of, retry, Subject, switchMap, takeWhile, tap, throwError, timer } from 'rxjs';
+
+export interface SpeechJob {
+  id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'expired';
+  queue_position?: number | null;
+  completed_segments: number;
+  total_segments: number;
+}
 
 export interface Album {
   albumId: string;
@@ -123,8 +131,26 @@ export class PhotoService {
     });
   }
 
-  getSummarySpeech(photoId: number, summary: string): Observable<Blob> {
-    return this.http.post(`/api/summary/photos/${photoId}/speech`, { summary }, { responseType: 'blob' });
+  getSummarySpeech(photoId: number, summary: string): Observable<SpeechJob | Blob> {
+    const base = `/api/summary/photos/${photoId}/speech/jobs`;
+    return this.http.post<SpeechJob>(base, { summary }).pipe(
+      expand(job => job.status === 'queued' || job.status === 'running'
+        ? timer(1500).pipe(switchMap(() => this.http.post<SpeechJob>(`${base}/${job.id}`, { summary })))
+        : EMPTY),
+      switchMap(job => {
+        if (job.status === 'completed') {
+          return this.http.post(`${base}/${job.id}/audio`, { summary }, { responseType: 'blob' });
+        }
+        if (job.status === 'failed' || job.status === 'expired') {
+          return throwError(() => ({ status: job.status === 'expired' ? 410 : 502 }));
+        }
+        return of(job);
+      }),
+      // Retention expiry and a rotated signing key can invalidate a job handle. Resubmission is deduplicated.
+      retry({ count: 1, delay: error => error.status === 404 || error.status === 410
+        ? of(null) : throwError(() => error) }),
+      takeWhile(value => !(value instanceof Blob), true)
+    );
   }
 
   getSummary(photoId: number): Observable<SummaryResponses> {
