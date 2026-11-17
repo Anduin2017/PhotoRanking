@@ -145,7 +145,10 @@ Configure the server's existing `/data/appsettings.json` (or environment variabl
 "Summary": {
   "Endpoint": "https://ollama.aiursoft.com/api/chat",
   "Model": "aiursoft-localization:latest",
-  "ApiKey": "YOUR_DEDICATED_GATEWAY_KEY"
+  "ApiKey": "YOUR_DEDICATED_GATEWAY_KEY",
+  "TimeoutSeconds": 900,
+  "MaxOutputTokens": 4096,
+  "RetryDelaySeconds": 30
 }
 ```
 
@@ -160,6 +163,9 @@ environment:
   Summary__Endpoint: https://ollama.aiursoft.com/api/chat
   Summary__Model: aiursoft-localization:latest
   Summary__ApiKey: ${PHOTORANKING_AI_TOKEN}
+  Summary__TimeoutSeconds: 900
+  Summary__MaxOutputTokens: 4096
+  Summary__RetryDelaySeconds: 30
 ```
 
 Keep the token in the deployment's private environment file, outside Git. An `.env`
@@ -167,6 +173,14 @@ file keeps secrets separate from source control; it does not encrypt them. Gener
 waits until all three settings are valid. Advanced settings refresh progress and up
 to six recent, current summary examples every ten seconds. Click an example to open
 the photo and read its summary. Prompt edits also immediately hide stale examples.
+Each round has its own configurable deadline (including first-token wait) and
+output-token budget. Summary requests disable extra reasoning. Incomplete or
+budget-exhausted responses are not saved as successful rounds. Completed rounds
+are checkpointed against the prompt timestamp and reused after a failure or
+restart; changing prompts cancels the active round and discards the old checkpoints.
+The progress panel shows the current photo and round, saved rounds, first-token
+wait (including queueing and prefill), generation time and retry errors. Shared
+backend failures back off before starting another sweep.
 Credentials are
 never returned by the settings API. PhotoRanking remains a private library behind
 its existing login proxy; these settings apply to that library. Generation sends a

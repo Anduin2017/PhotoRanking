@@ -32,10 +32,12 @@ public class SummaryController(PhotoSummaryService service, AppDbContext context
             topPercent = state.SummaryTopPercent,
             promptsModifiedAt = state.SummaryPromptsModifiedAt,
             configured = service.IsConfigured,
+            generation = service.GetProgress(state.SummaryPromptsModifiedAt),
             examples,
             targetCount = await target.CountAsync(ct),
             completedCount = await target.CountAsync(p => p.Summary != null && p.SummaryResponse1 != null &&
                 p.SummaryResponse2 != null && p.SummaryGeneratedAt != null &&
+                (p.SummaryCheckpointPromptsModifiedAt == null || p.SummaryCompletedRounds == 3) &&
                 p.SummaryGeneratedAt >= state.SummaryPromptsModifiedAt, ct)
         });
     }

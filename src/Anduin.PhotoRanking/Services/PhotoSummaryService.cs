@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text;
 using Microsoft.Extensions.Options;
 using Anduin.PhotoRanking.Data;
 using Anduin.PhotoRanking.Models;
@@ -14,8 +15,11 @@ public class PhotoSummaryService(
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
     IOptions<SummaryOptions> options,
-    ILogger<PhotoSummaryService> logger)
+    ILogger<PhotoSummaryService> logger, SummaryProgress? progress = null)
 {
+    private readonly SummaryProgress _progress = progress ?? new SummaryProgress();
+
+    public SummaryGenerationStatus GetProgress(DateTime version) => _progress.Get(version);
     public bool IsConfigured => options.Value.IsConfigured;
 
     public async Task<SystemState> GetSettingsAsync(CancellationToken ct)
@@ -48,6 +52,7 @@ public class PhotoSummaryService(
         state.SummaryTopPercent = settings.TopPercent;
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        _progress.Invalidate(state.SummaryPromptsModifiedAt);
     }
 
     public async Task<IQueryable<Photo>> GetTargetPhotosAsync(SystemState settings, CancellationToken ct)
@@ -75,7 +80,11 @@ public class PhotoSummaryService(
                  ?? DateTime.MinValue))
             .Select(p => new SummaryResponses
             {
-                Summary = p.Summary, Response1 = p.SummaryResponse1, Response2 = p.SummaryResponse2
+                Summary = p.Summary,
+                Response1 = p.SummaryCheckpointPromptsModifiedAt != null && p.SummaryCompletedRounds < 3
+                    ? null : p.SummaryResponse1,
+                Response2 = p.SummaryCheckpointPromptsModifiedAt != null && p.SummaryCompletedRounds < 3
+                    ? null : p.SummaryResponse2
             }).FirstOrDefaultAsync(ct) ?? new SummaryResponses();
     }
 
@@ -89,11 +98,16 @@ public class PhotoSummaryService(
         }
         var settings = await GetSettingsAsync(ct);
         if (settings.SummaryTopPercent <= 0) return;
+        if (_progress.Get(settings.SummaryPromptsModifiedAt).NextRetryAt > DateTime.UtcNow) return;
         var target = await GetTargetPhotosAsync(settings, ct);
         var pendingIds = await target
             .Where(p => p.Summary == null || p.SummaryResponse1 == null || p.SummaryResponse2 == null ||
                         p.SummaryGeneratedAt == null ||
-                        p.SummaryGeneratedAt < settings.SummaryPromptsModifiedAt)
+                        p.SummaryGeneratedAt < settings.SummaryPromptsModifiedAt ||
+                        (p.SummaryCheckpointPromptsModifiedAt != null && p.SummaryCompletedRounds < 3))
+            .OrderByDescending(p => p.SummaryCheckpointPromptsModifiedAt == settings.SummaryPromptsModifiedAt &&
+                                    p.SummaryCompletedRounds > 0)
+            .ThenByDescending(p => p.IndependentScore ?? p.EstimatedScore).ThenBy(p => p.Id)
             .Select(p => p.Id).ToListAsync(ct);
 
         foreach (var id in pendingIds)
@@ -113,15 +127,40 @@ public class PhotoSummaryService(
             {
                 throw;
             }
-            catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or
-                System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests)
+            catch (OperationCanceledException)
             {
-                logger.LogWarning("Summary gateway rejected the sweep with status {Status}; will retry later.", ex.StatusCode);
+                // A local prompt edit cancels the old in-flight round. SQL guards also
+                // protect checkpoints if a different application instance edits prompts.
+                return;
+            }
+            catch (TimeoutException ex)
+            {
+                _progress.Failed($"The model round exceeded {options.Value.TimeoutSeconds} seconds. Saved rounds will be reused.",
+                    options.Value.RetryDelaySeconds);
+                logger.LogWarning(ex, "Summary round timed out for photo {PhotoId}; saved rounds will be reused.", id);
+                return;
+            }
+            catch (HttpRequestException ex)
+            {
+                var status = ex.StatusCode.HasValue ? $"HTTP {(int)ex.StatusCode.Value}" : "a connection error";
+                _progress.Failed($"The model service returned {status}. Saved rounds will be reused.",
+                    options.Value.RetryDelaySeconds);
+                logger.LogWarning(ex, "Summary gateway failed for photo {PhotoId}; backing off before retry.", id);
+                // A shared backend failure must not cause thousands of immediate retries.
+                return;
+            }
+            catch (IOException ex)
+            {
+                _progress.Failed("The model connection was interrupted. Saved rounds will be reused.",
+                    options.Value.RetryDelaySeconds);
+                logger.LogWarning(ex, "Summary stream was interrupted for photo {PhotoId}.", id);
                 return;
             }
             catch (Exception ex)
             {
-                // Do not persist failures as successful summaries or starve later photos.
+                _progress.Failed(ex is InvalidDataException
+                    ? "The model response was incomplete or exceeded its output budget. Saved rounds will be reused."
+                    : "The photo could not be summarized. Saved rounds will be reused.", options.Value.RetryDelaySeconds);
                 logger.LogWarning(ex, "Could not summarize photo {PhotoId}; will retry next sweep.", id);
             }
         }
@@ -143,38 +182,134 @@ public class PhotoSummaryService(
         using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 90);
         var base64 = Convert.ToBase64String(encoded.ToArray());
 
-        using var client = httpClientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromMinutes(5);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.ApiKey);
-        var messages = new List<object>();
-        var prompts = new[] { settings.SummaryPrompt1, settings.SummaryPrompt2, settings.SummaryPrompt3 };
         var answers = new List<string>();
-        for (var i = 0; i < prompts.Length; i++)
+        if (photo.SummaryCheckpointPromptsModifiedAt == settings.SummaryPromptsModifiedAt)
         {
-            if ((await GetSettingsAsync(ct)).SummaryPromptsModifiedAt != settings.SummaryPromptsModifiedAt) return;
-            messages.Add(i == 0
-                ? new { role = "user", content = prompts[i], images = new[] { base64 } }
-                : new { role = "user", content = prompts[i] });
-            using var response = await client.PostAsJsonAsync(
-                options.Value.Endpoint,
-                new { model = options.Value.Model, stream = false, messages }, ct);
-            response.EnsureSuccessStatusCode();
-            var body = JObject.Parse(await response.Content.ReadAsStringAsync(ct));
-            var answer = body["message"]?["content"]?.Value<string>();
-            if (body["error"] != null || body["done"]?.Value<bool>() != true || string.IsNullOrWhiteSpace(answer))
-                throw new InvalidOperationException("The summary model did not return a complete answer.");
-            answers.Add(answer);
-            messages.Add(new { role = "assistant", content = answer });
+            if (photo.SummaryCompletedRounds >= 1 && !string.IsNullOrWhiteSpace(photo.SummaryResponse1))
+                answers.Add(photo.SummaryResponse1);
+            if (answers.Count == 1 && photo.SummaryCompletedRounds >= 2 && !string.IsNullOrWhiteSpace(photo.SummaryResponse2))
+                answers.Add(photo.SummaryResponse2);
         }
 
-        var generatedAt = DateTime.UtcNow;
-        // Atomic guard: a prompt edit while the last request runs must not revive an old poem.
-        var saved = await context.Photos.Where(p => p.Id == photo.Id &&
-                context.SystemStates.Any(s => s.SummaryPromptsModifiedAt == settings.SummaryPromptsModifiedAt))
-            .ExecuteUpdateAsync(u => u.SetProperty(p => p.Summary, answers[2])
-                .SetProperty(p => p.SummaryResponse1, answers[0])
-                .SetProperty(p => p.SummaryResponse2, answers[1])
-                .SetProperty(p => p.SummaryGeneratedAt, generatedAt), ct);
-        if (saved > 0) logger.LogInformation("Summarized photo {PhotoId}.", photo.Id);
+        using var photoCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _progress.BeginPhoto(photo.Id, settings.SummaryPromptsModifiedAt, answers.Count, photoCancellation);
+        try
+        {
+            var prompts = new[] { settings.SummaryPrompt1, settings.SummaryPrompt2, settings.SummaryPrompt3 };
+            var messages = new List<object>();
+            for (var i = 0; i < prompts.Length; i++)
+            {
+                if ((await GetSettingsAsync(ct)).SummaryPromptsModifiedAt != settings.SummaryPromptsModifiedAt) return;
+                messages.Add(i == 0
+                    ? new { role = "user", content = prompts[i], images = new[] { base64 } }
+                    : new { role = "user", content = prompts[i] });
+                if (i < answers.Count)
+                {
+                    messages.Add(new { role = "assistant", content = answers[i] });
+                    continue;
+                }
+
+                _progress.BeginRound(i + 1);
+                var answer = await ReadRoundAsync(messages, photoCancellation.Token);
+                photoCancellation.Token.ThrowIfCancellationRequested();
+                var eligible = context.Photos.Where(p => p.Id == photo.Id &&
+                    context.SystemStates.Any(s => s.SummaryPromptsModifiedAt == settings.SummaryPromptsModifiedAt));
+                if (i == 0)
+                {
+                    // Do not overwrite a checkpoint published by another worker.
+                    eligible = eligible.Where(p => p.SummaryCheckpointPromptsModifiedAt != settings.SummaryPromptsModifiedAt ||
+                        p.SummaryCompletedRounds == 0);
+                }
+                else
+                {
+                    var first = answers[0];
+                    eligible = eligible.Where(p => p.SummaryCheckpointPromptsModifiedAt == settings.SummaryPromptsModifiedAt &&
+                        p.SummaryCompletedRounds == i && p.SummaryResponse1 == first);
+                    if (i == 2)
+                    {
+                        var second = answers[1];
+                        eligible = eligible.Where(p => p.SummaryResponse2 == second);
+                    }
+                }
+
+                var saved = i switch
+                {
+                    0 => await eligible.ExecuteUpdateAsync(u => u
+                        .SetProperty(p => p.SummaryResponse1, answer).SetProperty(p => p.SummaryResponse2, (string?)null)
+                        .SetProperty(p => p.SummaryCheckpointPromptsModifiedAt, settings.SummaryPromptsModifiedAt)
+                        .SetProperty(p => p.SummaryCompletedRounds, 1), ct),
+                    1 => await eligible.ExecuteUpdateAsync(u => u.SetProperty(p => p.SummaryResponse2, answer)
+                        .SetProperty(p => p.SummaryCompletedRounds, 2), ct),
+                    _ => await eligible.ExecuteUpdateAsync(u => u.SetProperty(p => p.Summary, answer)
+                        .SetProperty(p => p.SummaryGeneratedAt, DateTime.UtcNow)
+                        .SetProperty(p => p.SummaryCompletedRounds, 3), ct)
+                };
+                if (saved == 0) return;
+                answers.Add(answer);
+                messages.Add(new { role = "assistant", content = answer });
+                _progress.RoundSaved(i + 1);
+                logger.LogInformation("Saved summary round {Round} for photo {PhotoId}.", i + 1, photo.Id);
+            }
+            logger.LogInformation("Summarized photo {PhotoId}.", photo.Id);
+        }
+        finally
+        {
+            _progress.EndPhoto(photoCancellation);
+        }
+    }
+
+    private async Task<string> ReadRoundAsync(List<object> messages, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(options.Value.TimeoutSeconds));
+        using var client = httpClientFactory.CreateClient();
+        client.Timeout = Timeout.InfiniteTimeSpan;
+        using var request = new HttpRequestMessage(HttpMethod.Post, options.Value.Endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.ApiKey);
+        request.Content = JsonContent.Create(new
+        {
+            model = options.Value.Model, stream = true, think = false, messages,
+            options = new { num_predict = options.Value.MaxOutputTokens }
+        });
+        try
+        {
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+            response.EnsureSuccessStatusCode();
+            await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
+            using var reader = new StreamReader(stream);
+            var answer = new StringBuilder();
+            while (await reader.ReadLineAsync(deadline.Token) is { } line)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (line.Length > 1_000_000) throw new InvalidDataException("Model response exceeded its size limit.");
+                var chunk = JObject.Parse(line);
+                if (chunk["error"] != null) throw new InvalidDataException("The model returned an error.");
+                var content = chunk["message"]?["content"]?.Value<string>();
+                if (!string.IsNullOrEmpty(content) || !string.IsNullOrEmpty(chunk["message"]?["thinking"]?.Value<string>()))
+                    _progress.TokenReceived();
+                // Ollama normally ends with an empty terminal message. The gateway
+                // can include the complete answer again in that terminal message.
+                var done = chunk["done"]?.Value<bool>() == true;
+                if (done && !string.IsNullOrEmpty(content) && answer.Length > 0 &&
+                    content.StartsWith(answer.ToString(), StringComparison.Ordinal))
+                    answer.Clear().Append(content);
+                else
+                    answer.Append(content);
+                if (answer.Length > 1_000_000) throw new InvalidDataException("Model response exceeded its size limit.");
+                if (!done) continue;
+                var reason = chunk["done_reason"]?.Value<string>();
+                if (reason is "length" or "max_tokens" ||
+                    (string.IsNullOrEmpty(reason) && chunk["eval_count"]?.Value<int>() >= options.Value.MaxOutputTokens))
+                    throw new InvalidDataException("The model exhausted its output budget.");
+                if (answer.Length == 0 || string.IsNullOrWhiteSpace(answer.ToString()))
+                    throw new InvalidDataException("The model returned an empty answer.");
+                return answer.ToString();
+            }
+            throw new InvalidDataException("The model response ended before completion.");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new TimeoutException("The model round exceeded its configured deadline.");
+        }
     }
 }

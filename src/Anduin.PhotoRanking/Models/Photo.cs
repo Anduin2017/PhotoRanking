@@ -152,4 +152,10 @@ public class Photo
 
     [JsonIgnore]
     public DateTime? SummaryGeneratedAt { get; set; }
+
+    [JsonIgnore]
+    public DateTime? SummaryCheckpointPromptsModifiedAt { get; set; }
+
+    [JsonIgnore]
+    public int SummaryCompletedRounds { get; set; }
 }
