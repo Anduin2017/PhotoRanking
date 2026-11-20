@@ -39,7 +39,12 @@ public class Startup : IWebStartup
         {
             services.AddSingleton(rankingSession);
             services.AddHttpClient<RankingSession>(client => client.Timeout = TimeSpan.FromSeconds(5))
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    UseProxy = false
+                });
             services.AddAuthentication().AddCookie(RankingSession.Scheme, options =>
             {
                 options.Cookie.Name = RankingSession.CookieName;
@@ -100,7 +105,7 @@ public class Startup : IWebStartup
             if (!Path.HasExtension(context.Request.Path.Value) ||
                 string.Equals(Path.GetExtension(context.Request.Path.Value), ".html", StringComparison.OrdinalIgnoreCase))
             {
-                context.Response.Headers.CacheControl = "no-cache";
+                context.Response.Headers.TryAdd("Cache-Control", "no-cache");
             }
             await next();
         });

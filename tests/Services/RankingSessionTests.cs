@@ -2,7 +2,6 @@ using System.Net;
 using System.Security.Claims;
 using Anduin.PhotoRanking.Services;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
 namespace Anduin.PhotoRanking.Tests.Services;
