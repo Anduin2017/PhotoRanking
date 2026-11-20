@@ -35,28 +35,7 @@ public class Startup : IWebStartup
         services.AddHttpClient();
         services.AddTaskCanon();
 
-        if (RankingSession.Settings.Read(configuration) is { } rankingSession)
-        {
-            services.AddSingleton(rankingSession);
-            services.AddHttpClient<RankingSession>(client => client.Timeout = TimeSpan.FromSeconds(5))
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-                {
-                    AllowAutoRedirect = false,
-                    UseCookies = false,
-                    UseProxy = false
-                });
-            services.AddAuthentication().AddCookie(RankingSession.Scheme, options =>
-            {
-                options.Cookie.Name = RankingSession.CookieName;
-                options.Cookie.Path = "/";
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-                options.Cookie.SameSite = SameSiteMode.Lax;
-                options.Cookie.HttpOnly = true;
-                options.Cookie.MaxAge = RankingSession.Lifetime;
-                options.ExpireTimeSpan = RankingSession.Lifetime;
-                options.SlidingExpiration = false;
-            });
-        }
+        RankingSession.Add(services, configuration);
 
         services.AddScoped<ScoringService>();
         services.AddScoped<PersonalizedPredictionService>();
@@ -87,17 +66,8 @@ public class Startup : IWebStartup
 
     public void Configure(WebApplication app)
     {
-        if (app.Services.GetService<RankingSession.Settings>() is not null)
-        {
-            // Only a build with its session gate enabled listens on the public proxy's upstream port.
-            app.Urls.Add("http://*:5000");
-            app.Urls.Add($"http://*:{RankingSession.Port}");
-            app.Use(async (context, next) =>
-            {
-                var session = context.RequestServices.GetRequiredService<RankingSession>();
-                if (await session.AuthenticateAsync(context)) await next();
-            });
-        }
+        app.UseAuthentication();
+        RankingSession.Use(app);
 
         // Revalidate the SPA shell so it references the assets from the current release.
         app.Use(async (context, next) =>
@@ -120,7 +90,6 @@ public class Startup : IWebStartup
             });
         }
         app.UseRouting();
-        app.UseAuthentication();
         app.UseAuthorization();
         app.MapDefaultControllerRoute();
         app.MapFallbackToFile(Directory.Exists(distPath) ? "dist/index.html" : "index.html");
