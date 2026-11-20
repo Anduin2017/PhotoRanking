@@ -1,125 +1,122 @@
-using System.Net;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Anduin.PhotoRanking.Services;
 
-public sealed class RankingSession(HttpClient client, RankingSession.Settings settings)
+public static class RankingSession
 {
-    public const string Scheme = "PhotoRanking";
+    public const string Scheme = "PhotoRanking.OidcSession";
     public const string CookieName = "__Host-PhotoRanking";
-    public const string Port = "5001";
-    public static readonly TimeSpan Lifetime = TimeSpan.FromDays(180);
+    public const string CallbackPath = "/signin-oidc";
+    private static readonly TimeSpan Lifetime = TimeSpan.FromDays(180);
 
-    public sealed record Settings(Uri Outpost, Uri PublicOrigin, string Application)
+    public static void Add(IServiceCollection services, IConfiguration configuration)
     {
-        public static Settings? Read(IConfiguration configuration)
-        {
-            var section = configuration.GetSection("RankingSession");
-            if (!section.Exists()) return null;
+        var section = configuration.GetSection("RankingOidc");
+        if (!section.Exists()) return;
 
-            var outpost = ReadOrigin(section, "Outpost", allowHttp: true);
-            var publicOrigin = ReadOrigin(section, "PublicOrigin", allowHttp: false);
-            var application = section["Application"];
-            if (string.IsNullOrWhiteSpace(application))
-                throw new InvalidOperationException("RankingSession:Application is required.");
-            return new Settings(outpost, publicOrigin, application);
-        }
+        var authority = ReadHttpsUrl(section, "Authority");
+        var publicOrigin = ReadHttpsUrl(section, "PublicOrigin");
+        if (publicOrigin.AbsolutePath != "/")
+            throw new InvalidOperationException("RankingOidc:PublicOrigin must be an HTTPS origin.");
+        var clientId = RequiredValue(section, "ClientId");
+        var clientSecret = RequiredValue(section, "ClientSecret");
+        services.AddSingleton(new Enabled(publicOrigin.GetLeftPart(UriPartial.Authority)));
 
-        private static Uri ReadOrigin(IConfiguration section, string name, bool allowHttp)
-        {
-            if (!Uri.TryCreate(section[name], UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttps && !(allowHttp && uri.Scheme == Uri.UriSchemeHttp)) ||
-                uri.PathAndQuery != "/" || uri.Fragment.Length > 0 || uri.UserInfo.Length > 0)
-                throw new InvalidOperationException($"RankingSession:{name} must be an HTTP(S) origin.");
-            return uri;
-        }
+        services.AddAuthentication(Scheme)
+            .AddCookie(Scheme, options =>
+            {
+                options.Cookie.Name = CookieName;
+                options.Cookie.Path = "/";
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.MaxAge = Lifetime;
+                options.ExpireTimeSpan = Lifetime;
+                options.SlidingExpiration = false;
+            })
+            .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+            {
+                options.Authority = authority.AbsoluteUri;
+                options.ClientId = clientId;
+                options.ClientSecret = clientSecret;
+                options.SignInScheme = Scheme;
+                options.CallbackPath = CallbackPath;
+                options.ResponseType = OpenIdConnectResponseType.Code;
+                options.UsePkce = true;
+                options.UseTokenLifetime = false;
+                options.SaveTokens = false;
+                options.MapInboundClaims = false;
+                options.Scope.Clear();
+                options.Scope.Add("openid");
+                options.Events.OnRedirectToIdentityProvider = context =>
+                {
+                    context.ProtocolMessage.RedirectUri = new Uri(publicOrigin, CallbackPath).AbsoluteUri;
+                    return Task.CompletedTask;
+                };
+                options.Events.OnRemoteFailure = async context =>
+                {
+                    context.HandleResponse();
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.Headers.CacheControl = "no-store";
+                    await context.Response.WriteAsync("Sign-in could not be completed. Open PhotoRanking to try again.");
+                };
+            });
     }
 
-    public async Task<bool> AuthenticateAsync(HttpContext context)
+    public static void Use(WebApplication app)
     {
-        var result = await context.AuthenticateAsync(Scheme);
-        if (result.Succeeded && result.Principal is { } principal)
-        {
-            context.User = principal;
-            return true;
-        }
+        if (app.Services.GetService<Enabled>() is not { } settings) return;
 
-        var request = context.Request;
-        context.Response.Headers.CacheControl = "no-store";
-        var hasAuthorizationHeader = request.Headers.Authorization.Count > 0;
-        var canRedirect = !hasAuthorizationHeader && (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method));
-
-        var proxyCookies = request.Headers.Cookie
-            .SelectMany(value => value?.Split(';', StringSplitOptions.TrimEntries) ?? [])
-            .Where(value => value.StartsWith("authentik_proxy_", StringComparison.Ordinal));
-        var cookie = string.Join("; ", proxyCookies);
-        if (cookie.Length == 0 && !hasAuthorizationHeader)
+        // Caddy's new upstream is available only when native authentication is configured.
+        app.Urls.Add("http://*:5000");
+        app.Urls.Add("http://*:5001");
+        app.Use(async (context, next) =>
         {
-            Challenge(context, canRedirect);
-            return false;
-        }
-
-        using var check = new HttpRequestMessage(HttpMethod.Get, new Uri(settings.Outpost, "/outpost.goauthentik.io/auth/caddy"));
-        if (cookie.Length > 0) check.Headers.TryAddWithoutValidation("Cookie", cookie);
-        if (hasAuthorizationHeader) check.Headers.TryAddWithoutValidation("Authorization", request.Headers.Authorization.AsEnumerable());
-        check.Headers.Add("X-Forwarded-Proto", settings.PublicOrigin.Scheme);
-        check.Headers.Add("X-Forwarded-Host", settings.PublicOrigin.Authority);
-        check.Headers.Add("X-Forwarded-Uri", "/");
-        try
-        {
-            using var response = await client.SendAsync(check, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-            if (response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.Unauthorized)
+            if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/sign-out")
             {
-                Challenge(context, canRedirect);
-                return false;
+                await context.SignOutAsync(Scheme);
+                context.Response.Headers.CacheControl = "no-store";
+                await context.Response.WriteAsync("Signed out of PhotoRanking.");
+                return;
             }
 
-            if (response.StatusCode == HttpStatusCode.OK &&
-                ReadHeader(response, "X-Authentik-Meta-App") == settings.Application &&
-                ReadHeader(response, "X-Authentik-Uid") is { Length: > 0 } subject)
+            if (context.User.Identity?.IsAuthenticated == true)
             {
-                var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, subject)], Scheme);
-                context.User = new ClaimsPrincipal(identity);
-                // Keep API header credentials limited to the current request.
-                if (!hasAuthorizationHeader)
-                    await context.SignInAsync(Scheme, context.User, new AuthenticationProperties { IsPersistent = true });
-                return true;
+                await next();
+                return;
             }
 
-            context.Response.StatusCode = response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Forbidden
-                ? StatusCodes.Status403Forbidden
-                : StatusCodes.Status503ServiceUnavailable;
-        }
-        catch (HttpRequestException)
-        {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-        }
-        catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
-        {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-        }
+            context.Response.Headers.CacheControl = "no-store";
+            if (context.Request.Path.StartsWithSegments("/api") ||
+                (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method)))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
 
-        return false;
+            await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, new AuthenticationProperties
+            {
+                RedirectUri = settings.PublicOrigin + context.Request.GetEncodedPathAndQuery(),
+                IsPersistent = true
+            });
+        });
     }
 
-    private void Challenge(HttpContext context, bool canRedirect)
+    private static string RequiredValue(IConfiguration section, string name) =>
+        section[name] is { } value && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : throw new InvalidOperationException($"RankingOidc:{name} is required.");
+
+    private static Uri ReadHttpsUrl(IConfiguration section, string name)
     {
-        if (!canRedirect)
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return;
-        }
-
-        var returnUrl = settings.PublicOrigin.GetLeftPart(UriPartial.Authority) + context.Request.GetEncodedPathAndQuery();
-        context.Response.Redirect("/outpost.goauthentik.io/start" + QueryString.Create("rd", returnUrl));
+        if (!Uri.TryCreate(RequiredValue(section, name), UriKind.Absolute, out var url) ||
+            url.Scheme != Uri.UriSchemeHttps || url.UserInfo.Length > 0 || url.Query.Length > 0 || url.Fragment.Length > 0)
+            throw new InvalidOperationException($"RankingOidc:{name} must be an HTTPS URL.");
+        return url;
     }
 
-    private static string? ReadHeader(HttpResponseMessage response, string name)
-    {
-        if (!response.Headers.TryGetValues(name, out var values)) return null;
-        var headers = values.ToArray();
-        return headers.Length == 1 ? headers[0] : null;
-    }
+    private sealed record Enabled(string PublicOrigin);
 }
