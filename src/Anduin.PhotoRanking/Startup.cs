@@ -35,6 +35,29 @@ public class Startup : IWebStartup
         services.AddHttpClient();
         services.AddTaskCanon();
 
+        if (RankingSession.Settings.Read(configuration) is { } rankingSession)
+        {
+            services.AddSingleton(rankingSession);
+            services.AddHttpClient<RankingSession>(client => client.Timeout = TimeSpan.FromSeconds(5))
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    UseProxy = false
+                });
+            services.AddAuthentication().AddCookie(RankingSession.Scheme, options =>
+            {
+                options.Cookie.Name = RankingSession.CookieName;
+                options.Cookie.Path = "/";
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.HttpOnly = true;
+                options.Cookie.MaxAge = RankingSession.Lifetime;
+                options.ExpireTimeSpan = RankingSession.Lifetime;
+                options.SlidingExpiration = false;
+            });
+        }
+
         services.AddScoped<ScoringService>();
         services.AddScoped<PersonalizedPredictionService>();
         services.AddScoped<SeederService>();
@@ -64,13 +87,25 @@ public class Startup : IWebStartup
 
     public void Configure(WebApplication app)
     {
+        if (app.Services.GetService<RankingSession.Settings>() is not null)
+        {
+            // Only a build with its session gate enabled listens on the public proxy's upstream port.
+            app.Urls.Add("http://*:5000");
+            app.Urls.Add($"http://*:{RankingSession.Port}");
+            app.Use(async (context, next) =>
+            {
+                var session = context.RequestServices.GetRequiredService<RankingSession>();
+                if (await session.AuthenticateAsync(context)) await next();
+            });
+        }
+
         // Revalidate the SPA shell so it references the assets from the current release.
         app.Use(async (context, next) =>
         {
             if (!Path.HasExtension(context.Request.Path.Value) ||
                 string.Equals(Path.GetExtension(context.Request.Path.Value), ".html", StringComparison.OrdinalIgnoreCase))
             {
-                context.Response.Headers.CacheControl = "no-cache";
+                context.Response.Headers.TryAdd("Cache-Control", "no-cache");
             }
             await next();
         });
