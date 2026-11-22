@@ -107,7 +107,7 @@ public class PhotoSummaryService(
                         (p.SummaryCheckpointPromptsModifiedAt != null && p.SummaryCompletedRounds < 3))
             .OrderByDescending(p => p.SummaryCheckpointPromptsModifiedAt == settings.SummaryPromptsModifiedAt &&
                                     p.SummaryCompletedRounds > 0)
-            .ThenByDescending(p => p.IndependentScore ?? p.EstimatedScore).ThenBy(p => p.Id)
+            .ThenByDescending(p => p.EstimatedScore).ThenBy(p => p.Id)
             .Select(p => p.Id).ToListAsync(ct);
 
         foreach (var id in pendingIds)
