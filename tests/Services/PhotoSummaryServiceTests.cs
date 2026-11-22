@@ -106,6 +106,34 @@ public class PhotoSummaryServiceTests
     }
 
     [TestMethod]
+    public async Task QueueResumesCheckpointsThenPrioritizesPredictionsWithinTheDisplayScoreCutoff()
+    {
+        await Save(40);
+        var version = (await _service.GetSettingsAsync(CancellationToken.None)).SummaryPromptsModifiedAt;
+        // The highest prediction is outside the cutoff because its manual score is zero.
+        await _context.Photos.Where(p => p.Id == 1)
+            .ExecuteUpdateAsync(u => u.SetProperty(p => p.IndependentScore, 0));
+        await _context.Photos.Where(p => p.Id >= 3 && p.Id <= 5)
+            .ExecuteUpdateAsync(u => u.SetProperty(p => p.IndependentScore, 6));
+        await _context.Photos.Where(p => p.Id == 4)
+            .ExecuteUpdateAsync(u => u.SetProperty(p => p.EstimatedScore, (double?)null));
+        await _context.Photos.Where(p => p.Id == 5).ExecuteUpdateAsync(u => u
+            .SetProperty(p => p.SummaryCheckpointPromptsModifiedAt, version)
+            .SetProperty(p => p.SummaryCompletedRounds, 1)
+            .SetProperty(p => p.SummaryResponse1, "Saved first round"));
+
+        await _service.RunOnceAsync(CancellationToken.None);
+
+        Assert.HasCount(11, _model.Requests);
+        Assert.AreEqual("Saved first round", _model.Requests[0]["messages"]![1]!["content"]!.Value<string>());
+        Assert.AreEqual("answer 2", await _service.GetSummaryAsync(5, CancellationToken.None));
+        Assert.AreEqual("answer 5", await _service.GetSummaryAsync(2, CancellationToken.None));
+        Assert.AreEqual("answer 8", await _service.GetSummaryAsync(3, CancellationToken.None));
+        Assert.AreEqual("answer 11", await _service.GetSummaryAsync(4, CancellationToken.None));
+        Assert.IsNull(await _service.GetSummaryAsync(1, CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task ExpandingFillsTargetAndShrinkingKeepsPoemsButPromptEditsInvalidateEverything()
     {
         await _service.RunOnceAsync(CancellationToken.None);
