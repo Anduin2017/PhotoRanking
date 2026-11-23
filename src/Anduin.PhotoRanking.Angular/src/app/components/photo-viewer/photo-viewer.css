@@ -365,3 +365,12 @@
 
     .summary-poem { padding-block: 0.75lh; }
 }
+
+@media (min-width: 701px) and (min-height: 600px) and (pointer: coarse) {
+    .summary-scroller {
+        height: min(11lh, calc(100dvh - 14.5rem));
+        mask-image: linear-gradient(to bottom, transparent, #000 0.75lh, #000 calc(100% - 0.75lh), transparent);
+    }
+
+    .summary-poem { padding-block: 0.75lh; }
+}
