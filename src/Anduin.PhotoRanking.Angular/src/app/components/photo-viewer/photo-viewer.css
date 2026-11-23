@@ -344,3 +344,24 @@
 @media (max-width: 700px) {
     .summary-panel { right: 1rem; top: 37%; width: min(65vw, 20rem); font-size: 1rem; }
 }
+
+@media (min-width: 701px) and (hover: hover) and (pointer: fine) {
+    .summary-panel {
+        /* Leave room for the close button above and the viewer controls below. */
+        top: 5.5rem;
+        max-height: calc(100% - 14.5rem);
+        transform: none;
+        display: flex;
+        flex-direction: column;
+        font-size: clamp(1rem, 1.5vw, 1.25rem);
+        line-height: 1.5;
+    }
+
+    .summary-scroller {
+        height: 21lh;
+        min-height: 0;
+        mask-image: linear-gradient(to bottom, transparent, #000 0.75lh, #000 calc(100% - 0.75lh), transparent);
+    }
+
+    .summary-poem { padding-block: 0.75lh; }
+}
