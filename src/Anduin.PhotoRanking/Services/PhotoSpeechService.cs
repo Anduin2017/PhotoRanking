@@ -50,10 +50,27 @@ public class PhotoSpeechService(IHttpClientFactory clients, IOptions<TtsOptions>
         return job with { Id = job.Id + "." + Signature(photoId, summary, job.Id) };
     }
 
+    private static string AddSpeechPauses(string summary)
+    {
+        const string pausePunctuation = "，。；：、！？….,;:!?";
+        var lines = summary.ReplaceLineEndings("\n").Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd();
+            lines[i] = line.Length > 0 && !pausePunctuation.Contains(line[^1]) ? line + "；" : line;
+        }
+        return string.Join('\n', lines);
+    }
+
     public async Task<SpeechJob> SubmitAsync(int photoId, string summary, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, JobsUri);
-        request.Content = JsonContent.Create(new { voice = options.Value.EffectiveVoice, text = summary, response_format = "wav" });
+        request.Content = JsonContent.Create(new
+        {
+            voice = options.Value.EffectiveVoice,
+            text = AddSpeechPauses(summary),
+            response_format = "wav"
+        });
         using var response = await SendAsync(request, ct);
         return BoundJob(await response.Content.ReadFromJsonAsync<SpeechJob>(ct), photoId, summary);
     }

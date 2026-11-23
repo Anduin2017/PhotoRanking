@@ -56,10 +56,32 @@ public class PhotoSpeechTests
         Assert.AreEqual("Bearer synthetic-tts-key", _gateway.Authorization);
         Assert.AreEqual("https://tts.aiursoft.com/api/jobs", _gateway.Endpoint);
         StringAssert.Contains(_gateway.Form, "\"voice\":\"broadcasting\"");
-        Assert.AreEqual("第三轮诗歌", System.Text.Json.JsonDocument.Parse(_gateway.Form).RootElement.GetProperty("text").GetString());
+        Assert.AreEqual("第三轮诗歌；", System.Text.Json.JsonDocument.Parse(_gateway.Form).RootElement.GetProperty("text").GetString());
         _options.Voice = "another-profile";
         await Speak();
         StringAssert.Contains(_gateway.Form, "\"voice\":\"another-profile\"");
+    }
+
+    [TestMethod]
+    public async Task SpeechAddsPausesAtUnpunctuatedLineEndsWhileKeepingTheOriginalSummaryForPolling()
+    {
+        const string poem = "风穿过长街  \r\n月照着屋瓦，\r\n \t\r星光落下。\n夜色渐深；  \n潮声未歇!\n灯仍亮着\n";
+        const string spoken = "风穿过长街；\n月照着屋瓦，\n\n星光落下。\n夜色渐深；\n潮声未歇!\n灯仍亮着；\n";
+        _db.Photos.Single().Summary = poem;
+        await _db.SaveChangesAsync();
+
+        var request = new SummarySpeechRequest { Summary = poem };
+        var submitted = (ObjectResult)await _controller.CreateSpeechJob(1, request, CancellationToken.None);
+
+        Assert.AreEqual(202, submitted.StatusCode);
+        using var payload = System.Text.Json.JsonDocument.Parse(_gateway.Form);
+        Assert.AreEqual(spoken, payload.RootElement.GetProperty("text").GetString());
+        var job = (SpeechJob)submitted.Value!;
+        Assert.IsInstanceOfType<OkObjectResult>(
+            await _controller.GetSpeechJob(1, job.Id, request, CancellationToken.None));
+        Assert.IsInstanceOfType<FileContentResult>(
+            await _controller.GetSpeechAudio(1, job.Id, request, CancellationToken.None));
+        Assert.AreEqual(poem, await _db.Photos.Select(p => p.Summary).SingleAsync());
     }
 
     [TestMethod]
